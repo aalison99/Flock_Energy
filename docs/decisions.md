@@ -53,3 +53,8 @@ Short ADR-style entries, one per decision, in the order they were made. Each say
 - **Decision:** manage the backend with uv and a lockfile, on Python 3.13.
 - **Why:** reproducible installs with one command. 3.13 has mature wheels for every dependency.
 - **Cost:** reviewers need uv installed (one command, documented in the README).
+
+### ADR-011: Test the HTTP client against a fixture-built portal emulator
+- **Decision:** the real `HttpPortalClient` is tested through `httpx.MockTransport` with an emulator that answers like the portal (login, cookies, expiry signals, search rules, signed export), built from the captured fixtures. The same contract suite runs against the fake, the HTTP client, and (opt-in) the live portal.
+- **Why:** one suite proves all three behave identically; default test runs never touch the network.
+- **Cost:** the emulator can drift from the real portal; the opt-in live suite is the check on that.
