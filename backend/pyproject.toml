@@ -1,0 +1,38 @@
+[project]
+name = "urja-meter-api"
+version = "0.1.0"
+description = "Clean API service over the legacy Urja Meter Ops portal"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "fastapi>=0.162.0",
+    "pydantic>=2.14.2",
+    "pydantic-settings>=2.16.2",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["app", "scripts"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = ["live: hits the real portal (opt-in)"]
+addopts = "-m 'not live'"
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]

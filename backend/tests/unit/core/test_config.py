@@ -1,0 +1,104 @@
+from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
+
+from app.core import config
+from app.core.config import Settings, load_settings
+
+REQUIRED = ("URJA_PORTAL_URL", "URJA_PORTAL_EMAIL", "URJA_PORTAL_PASSWORD")
+
+
+@pytest.fixture
+def clean_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pytest.TempPathFactory
+) -> pytest.MonkeyPatch:
+    for name in REQUIRED:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.chdir(tmp_path)  # type: ignore[arg-type]
+    monkeypatch.setitem(Settings.model_config, "env_file", "/nonexistent/.env")
+    return monkeypatch
+
+
+def test_missing_required_fields_exit_with_names(clean_env: pytest.MonkeyPatch) -> None:
+    with pytest.raises(SystemExit) as exc:
+        load_settings()
+    msg = str(exc.value)
+    assert msg.startswith("Invalid configuration: missing or invalid ")
+    for name in REQUIRED:
+        assert name in msg
+    assert msg.endswith("See .env.example.")
+
+
+def test_env_vars_load(clean_env: pytest.MonkeyPatch) -> None:
+    clean_env.setenv("URJA_PORTAL_URL", "https://p.example.test")
+    clean_env.setenv("URJA_PORTAL_EMAIL", "a@b.test")
+    clean_env.setenv("URJA_PORTAL_PASSWORD", "pw")
+    clean_env.setenv("URJA_LOG_LEVEL", "DEBUG")
+    s = load_settings()
+    assert str(s.portal_url).startswith("https://p.example.test")
+    assert s.portal_email == "a@b.test"
+    assert s.portal_password.get_secret_value() == "pw"
+    assert s.log_level == "DEBUG"
+    assert s.app_name == "Urja Meter API"
+    assert s.environment == "dev"
+    assert s.db_url == "sqlite:///./urja.db"
+    assert s.cors_origins == ["http://localhost:5173"]
+    assert s.http_timeout_s == 10.0
+
+
+def test_password_not_in_repr(settings: Settings) -> None:
+    assert "s3cret-value" not in repr(settings)
+    assert "s3cret-value" not in str(settings)
+
+
+@pytest.mark.parametrize("bad", [0, -1.5])
+def test_non_positive_timeout_rejected(bad: float) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            portal_url="https://x.example.test",  # type: ignore[arg-type]
+            portal_email="a@b.test",
+            portal_password="pw",  # type: ignore[arg-type]
+            http_timeout_s=bad,
+            _env_file=None,
+        )
+
+
+def test_env_file_is_repo_root_dotenv() -> None:
+    repo_root = Path(__file__).resolve().parents[4]
+    assert repo_root / ".env" == config.ENV_FILE
+
+
+def test_unparseable_complex_value_exits_cleanly(clean_env: pytest.MonkeyPatch) -> None:
+    for name, val in (
+        ("URJA_PORTAL_URL", "https://p.example.test"),
+        ("URJA_PORTAL_EMAIL", "a@b.test"),
+        ("URJA_PORTAL_PASSWORD", "pw"),
+        ("URJA_CORS_ORIGINS", "http://x"),
+    ):
+        clean_env.setenv(name, val)
+    with pytest.raises(SystemExit) as exc:
+        load_settings()
+    assert "URJA_CORS_ORIGINS" in str(exc.value)
+
+
+def test_invalid_log_level_exits_cleanly(clean_env: pytest.MonkeyPatch) -> None:
+    clean_env.setenv("URJA_PORTAL_URL", "https://p.example.test")
+    clean_env.setenv("URJA_PORTAL_EMAIL", "a@b.test")
+    clean_env.setenv("URJA_PORTAL_PASSWORD", "pw")
+    clean_env.setenv("URJA_LOG_LEVEL", "loud")
+    with pytest.raises(SystemExit) as exc:
+        load_settings()
+    assert "URJA_LOG_LEVEL" in str(exc.value)
+
+
+@pytest.mark.parametrize(("raw", "norm"), [("debug", "DEBUG"), ("Warning", "WARNING")])
+def test_log_level_normalised(raw: str, norm: str) -> None:
+    s = Settings(
+        portal_url="https://x.example.test",
+        portal_email="a@b.test",
+        portal_password="pw",
+        log_level=raw,
+        _env_file=None,
+    )
+    assert s.log_level == norm
