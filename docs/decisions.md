@@ -58,3 +58,13 @@ Short ADR-style entries, one per decision, in the order they were made. Each say
 - **Decision:** the real `HttpPortalClient` is tested through `httpx.MockTransport` with an emulator that answers like the portal (login, cookies, expiry signals, search rules, signed export), built from the captured fixtures. The same contract suite runs against the fake, the HTTP client, and (opt-in) the live portal.
 - **Why:** one suite proves all three behave identically; default test runs never touch the network.
 - **Cost:** the emulator can drift from the real portal; the opt-in live suite is the check on that.
+
+### ADR-012: Caching TTLs and stale-on-error
+- **Decision:** cache nameplate-type portal data (meter list/detail, geo, transformers) for 24 h and readings for 15 min; never cache the bulk export (the local index is its cache). When the portal is unavailable and an expired entry exists, serve it marked `stale: true`.
+- **Why:** nameplate data rarely changes and the finest reading interval is 30 min; serving slightly old data with an explicit flag beats failing while the portal is down.
+- **Cost:** a value can be up to one TTL out of date; no single-flight de-duplication, so simultaneous cache misses for one key each hit the portal (harmless at this data size).
+
+### ADR-013: Retry only "unavailable" errors; circuit breaker with per-call permits
+- **Decision:** retry timeouts/5xx/429 up to 3 attempts with jittered exponential backoff (honouring Retry-After up to a cap); never retry not-found, auth or protocol errors. After 5 consecutive failures (auth failures included) the circuit opens for 30 s, then admits one half-open trial. Every call gets a permit at admission; once the circuit has opened, only the current trial's permit can close or reopen it.
+- **Why:** retrying can't fix a 404 or a bad password; counting auth failures stops login hammering; permits stop slow calls from before an outage flipping the circuit.
+- **Cost:** the circuit may stay open up to `reset_s` longer than strictly needed.
