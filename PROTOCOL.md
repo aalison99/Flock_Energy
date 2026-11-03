@@ -66,6 +66,7 @@ All `/portal/*` endpoints return `application/json`. No caching headers were obs
 - **Out-of-range pages:** `page=0`, `-1` and `abc` all silently return page 1. A page past the end (`22`) returns `data: []`, with the true `total` still set.
 - **`q` matching:** case-insensitive *substring* match on **meter ID and serial number only**. `0001` matches J100001 and J100010–J100019; `se33962` matches `SE33962`. Make, status and DT code are **not** searched (`HPL`, `Installed` and `DT-007` all return 0).
 - An empty or missing `q` lists everything.
+- With a query, `total` is the **number of matches** (e.g. `q=SE3` → `total: 8`), so paging works the same for filtered results.
 
 ### 3.2 Meter detail: `GET /meters/<meterId>/__data.json`
 This is SvelteKit route data, not a REST endpoint. Its shape is `{"type":"data","nodes":[layout, user, page]}`. The page node uses **devalue** encoding: `data` is a flat array, and objects refer to other entries by **index**. For example, `{"meterId":1}` means "the value at index 1".
