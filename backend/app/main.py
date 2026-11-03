@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import __version__
 from app.api.v1.router import api_router
 from app.core.config import Settings, load_settings
-from app.core.deps import wire
+from app.core.deps import lifespan, wire
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
@@ -20,6 +20,7 @@ def create_app(settings: Settings) -> FastAPI:
         version=__version__,
         docs_url="/docs",
         openapi_url="/openapi.json",
+        lifespan=lifespan,
     )
     wire(app, settings)
     app.add_middleware(

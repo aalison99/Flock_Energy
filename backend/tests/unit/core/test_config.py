@@ -102,3 +102,57 @@ def test_log_level_normalised(raw: str, norm: str) -> None:
         _env_file=None,
     )
     assert s.log_level == norm
+
+
+def _build(**overrides: object) -> Settings:
+    return Settings(
+        portal_url="https://x.example.test",  # type: ignore[arg-type]
+        portal_email="a@b.test",
+        portal_password="pw",  # type: ignore[arg-type]
+        _env_file=None,
+        **overrides,  # type: ignore[arg-type]
+    )
+
+
+def test_robustness_defaults(settings: Settings) -> None:
+    assert (settings.retry_attempts, settings.retry_base_delay_s) == (3, 0.25)
+    assert (settings.retry_max_delay_s, settings.retry_after_cap_s) == (4.0, 30.0)
+    assert (settings.breaker_failure_threshold, settings.breaker_reset_s) == (5, 30.0)
+    assert (settings.ttl_static_s, settings.ttl_readings_s) == (86400.0, 900.0)
+    assert settings.cache_max_entries == 10000
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"retry_attempts": 0},
+        {"retry_base_delay_s": 0},
+        {"retry_max_delay_s": 0.1},  # below the default base of 0.25
+        {"retry_base_delay_s": 5.0},  # above the default max of 4.0
+        {"retry_after_cap_s": 0},
+        {"breaker_failure_threshold": 0},
+        {"breaker_reset_s": 0},
+        {"ttl_static_s": 0},
+        {"ttl_readings_s": -1},
+        {"cache_max_entries": 0},
+    ],
+)
+def test_robustness_constraints(bad: dict[str, float]) -> None:
+    with pytest.raises(ValidationError):
+        _build(**bad)
+
+
+def test_max_delay_equal_to_base_allowed() -> None:
+    assert _build(retry_base_delay_s=1.0, retry_max_delay_s=1.0).retry_max_delay_s == 1.0
+
+
+def test_model_level_error_names_the_fields(clean_env: pytest.MonkeyPatch) -> None:
+    clean_env.setenv("URJA_PORTAL_URL", "https://p.example.test")
+    clean_env.setenv("URJA_PORTAL_EMAIL", "a@b.test")
+    clean_env.setenv("URJA_PORTAL_PASSWORD", "pw")
+    clean_env.setenv("URJA_RETRY_BASE_DELAY_S", "9")
+    with pytest.raises(SystemExit) as exc:
+        load_settings()
+    msg = str(exc.value)
+    assert "URJA_RETRY_MAX_DELAY_S" in msg and "URJA_RETRY_BASE_DELAY_S" in msg
+    assert "URJA_?" not in msg

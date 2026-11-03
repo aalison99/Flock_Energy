@@ -136,6 +136,11 @@ def test_deps_may_import_clock(tmp_path: Path) -> None:
     assert check(root) == []
 
 
+def test_deps_may_import_cache(tmp_path: Path) -> None:
+    root = _pkg(tmp_path, {"core/deps.py": "from app.core.cache import InMemoryTTLCache\n"})
+    assert check(root) == []
+
+
 def test_syntax_error_is_reported_not_raised(tmp_path: Path) -> None:
     root = _pkg(tmp_path, {"services/s.py": "def (:\n"})
     vs = check(root)

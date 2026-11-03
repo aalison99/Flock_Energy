@@ -1,10 +1,11 @@
 """The PortalClient Protocol: the only surface the rest of the app sees of the legacy portal."""
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Protocol
 
 from app.domain.models import GeoPoint, Meter, Reading, Transformer
+from app.portal.breaker import BreakerState
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,3 +46,54 @@ class PortalClient(Protocol):
         ...
 
     async def aclose(self) -> None: ...
+
+
+class BreakerStateReader(Protocol):
+    """Read-only view of the portal circuit breaker (for health checks)."""
+
+    @property
+    def state(self) -> BreakerState: ...
+
+
+@dataclass(frozen=True)
+class Freshness:
+    """When a cached portal answer was fetched, when it expires, and whether it already has."""
+
+    fetched_at: datetime
+    expires_at: datetime
+    stale: bool
+
+
+class FreshnessReader(Protocol):
+    def freshness(self, method: str, *args: object) -> Freshness | None:
+        """Metadata of the currently cached entry for that call, if any."""
+        ...
+
+
+def cache_key(method: str, *args: object) -> str:
+    """Stable cache key: `portal:<method>:<normalised args joined by |>`.
+
+    None -> "-" and dates/datetimes -> ISO; `|` and `\\` inside parts are backslash-escaped.
+    The list_meters query is normalised with `normalise_query` (None -> "", stripped) and is
+    not lower-cased: the portal ignores case, but keys stay honest. Other strings are kept as is.
+    """
+    if method == "list_meters" and len(args) > 1:
+        args = (*args[:1], normalise_query(args[1]), *args[2:])
+    return "portal:" + method + ":" + "|".join(_norm(a) for a in args)
+
+
+def normalise_query(query: object) -> str:
+    """The search query as sent to the portal and as keyed: None -> "", surrounding blanks gone."""
+    return query.strip() if isinstance(query, str) else ""
+
+
+def _norm(arg: object) -> str:
+    if arg is None:
+        text = "-"
+    elif isinstance(arg, date):  # datetime is a date subclass
+        text = arg.isoformat()
+    elif isinstance(arg, str):
+        text = arg
+    else:
+        text = repr(arg)
+    return text.replace("\\", "\\\\").replace("|", "\\|")

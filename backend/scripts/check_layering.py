@@ -104,6 +104,12 @@ RULES: tuple[Rule, ...] = (
         ("app.core.clock",),
         skip_modules=("app.core.deps", "app.core.clock"),
     ),
+    Rule(
+        "cache-wired-in-deps",
+        (),
+        ("app.core.cache",),
+        skip_modules=("app.core.deps", "app.core.cache"),
+    ),
 )
 
 
