@@ -5,6 +5,7 @@ description = "Clean API service over the legacy Urja Meter Ops portal"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "fastapi>=0.162.0",
+    "httpx>=0.28.1",
     "pydantic>=2.14.2",
     "pydantic-settings>=2.16.2",
     "uvicorn[standard]>=0.54.0",
@@ -12,7 +13,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "mypy>=2.4.1",
     "pytest>=9.2.0",
     "ruff>=0.17.3",
