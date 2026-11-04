@@ -32,3 +32,28 @@ check: lint typecheck layering test openapi-check
 # NB: with --reload, uvicorn's reloader keeps running after a startup SystemExit (bad config).
 run:
 	cd backend && uv run uvicorn app.main:create_app_from_env --factory --reload --port 8000
+
+# --- Web client (frontend/) ---
+.PHONY: web-install web web-build web-lint web-test web-types check-all
+
+web-install:
+	npm --prefix frontend ci
+
+web:
+	npm --prefix frontend run dev
+
+web-build:
+	npm --prefix frontend run build
+
+web-lint:
+	npm --prefix frontend run lint
+
+web-test:
+	npm --prefix frontend run test
+
+web-types:
+	npm --prefix frontend run gen:types
+
+# make check stays backend-only; check-all adds the web client.
+check-all: check web-lint web-test web-build
+	npm --prefix frontend run check:types-drift

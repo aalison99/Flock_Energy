@@ -1,0 +1,1 @@
+export { HealthPill } from "./HealthPill";
