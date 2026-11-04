@@ -4,6 +4,46 @@
  */
 
 export interface paths {
+    "/api/v1/geo/bbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find meters in a bounding box
+         * @description Meters with a position inside the inclusive box, by meter id. Needs the local index. A box crossing the antimeridian is not supported.
+         */
+        get: operations["findMetersInBox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/geo/near": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find meters near a point
+         * @description Meters with a position within the radius, nearest first. Needs the local index.
+         */
+        get: operations["findMetersNear"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -50,9 +90,29 @@ export interface paths {
         };
         /**
          * List meters
-         * @description Paginated meter list, optionally narrowed by a search text on id or serial.
+         * @description Paginated meter list. Filters combine (all must match). While the local index is empty only `q` and the default sort are served, from the live portal; other filters then answer 409.
          */
         get: operations["listMeters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/meters/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count meters per attribute value
+         * @description Counts for filter chips. Each field's counts apply every filter except that field's own, so the alternatives stay visible. Meters lacking a value (no install type or DT) are not counted, so a field's counts may not sum to the total. Needs the local index.
+         */
+        get: operations["getMeterFacets"];
         put?: never;
         post?: never;
         delete?: never;
@@ -181,10 +241,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/transformers/{code}/meters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a transformer's meters
+         * @description Paginated meters installed on one transformer. Needs the local index.
+         */
+        get: operations["listTransformerMeters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * BBoxMeter
+         * @description A meter inside a bounding box (the slim shape a map needs).
+         */
+        BBoxMeter: {
+            /**
+             * Dt Code
+             * @description Code of the distribution transformer, if known.
+             */
+            dt_code: string | null;
+            /** @description Installation status. */
+            install_status: components["schemas"]["InstallStatus"];
+            /**
+             * Lat
+             * @description Latitude in degrees.
+             */
+            lat: number;
+            /**
+             * Lng
+             * @description Longitude in degrees.
+             */
+            lng: number;
+            /**
+             * Meter Id
+             * @description Portal meter id, J followed by six digits.
+             */
+            meter_id: string;
+        };
+        /**
+         * BBoxResponse
+         * @description Meters inside a bounding box.
+         * @example {
+         *       "items": [
+         *         {
+         *           "dt_code": "DT-001",
+         *           "install_status": "decommissioned",
+         *           "lat": 26.938961002479868,
+         *           "lng": 75.83095696146852,
+         *           "meter_id": "J100000"
+         *         }
+         *       ],
+         *       "truncated": false
+         *     }
+         */
+        BBoxResponse: {
+            /**
+             * Items
+             * @description Meters by meter id, at most `limit`.
+             */
+            items: components["schemas"]["BBoxMeter"][];
+            /**
+             * Truncated
+             * @description True when more meters matched than `limit` allowed.
+             */
+            truncated: boolean;
+        };
         /**
          * ErrorBody
          * @description The inner object of the error envelope.
@@ -215,6 +351,40 @@ export interface components {
         ErrorResponse: {
             /** @description The error. */
             error: components["schemas"]["ErrorBody"];
+        };
+        /**
+         * FacetField
+         * @description Meter attributes that can be counted.
+         * @enum {string}
+         */
+        FacetField: "status" | "make" | "phase" | "install_type" | "dt";
+        /**
+         * FacetsResponse
+         * @description Meter counts per attribute value, for building filter chips.
+         * @example {
+         *       "facets": {
+         *         "phase": {
+         *           "single": 277,
+         *           "three": 126
+         *         },
+         *         "status": {
+         *           "decommissioned": 75,
+         *           "faulty": 90,
+         *           "installed": 238
+         *         }
+         *       }
+         *     }
+         */
+        FacetsResponse: {
+            /**
+             * Facets
+             * @description For each requested field, the count of matching meters per value. Each field's counts apply every filter except that field's own; zero counts are omitted.
+             */
+            facets: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
         };
         /**
          * GeoOut
@@ -311,18 +481,18 @@ export interface components {
             /**
              * Fetched At
              * Format: date-time
-             * @description When the data was fetched from the portal (UTC).
+             * @description When the data was fetched from the portal or last synced into the index (UTC).
              */
             fetched_at: string;
             /**
              * Source
-             * @description Where the data came from.
-             * @constant
+             * @description Where the data came from: the live portal or the local index.
+             * @enum {string}
              */
-            source: "portal";
+            source: "portal" | "index";
             /**
              * Stale
-             * @description True when the cached data is past its TTL and the portal could not refresh it.
+             * @description True when the data is older than its freshness limit (portal cache TTL, or the index's maximum age).
              */
             stale: boolean;
         };
@@ -429,6 +599,12 @@ export interface components {
             serial_no: string;
         };
         /**
+         * MeterSort
+         * @description Sort keys for meter lists; ties are always broken by meter_id.
+         * @enum {string}
+         */
+        MeterSort: "meter_id" | "-meter_id" | "make" | "status";
+        /**
          * MeterSummary
          * @description A meter as shown in lists.
          * @example {
@@ -465,6 +641,40 @@ export interface components {
              * @description Manufacturer serial number.
              */
             serial_no: string;
+        };
+        /**
+         * NearMeter
+         * @description A meter found near a point, with its position and distance.
+         */
+        NearMeter: {
+            /**
+             * Distance Km
+             * @description Great-circle distance from the search point in km.
+             */
+            distance_km: number;
+            /**
+             * Lat
+             * @description Latitude in degrees.
+             */
+            lat: number;
+            /**
+             * Lng
+             * @description Longitude in degrees.
+             */
+            lng: number;
+            /** @description The meter. */
+            meter: components["schemas"]["MeterSummary"];
+        };
+        /**
+         * NearResponse
+         * @description Meters within a radius, nearest first.
+         */
+        NearResponse: {
+            /**
+             * Items
+             * @description Meters ordered by distance, then meter id.
+             */
+            items: components["schemas"]["NearMeter"][];
         };
         /** Page[MeterSummary] */
         Page_MeterSummary_: {
@@ -915,6 +1125,7 @@ export interface components {
          *       "capacity_kva": 100,
          *       "code": "DT-001",
          *       "feeder_code": "F-001",
+         *       "meter_count": 10,
          *       "name": "Malviya Nagar DT 1"
          *     }
          */
@@ -935,6 +1146,11 @@ export interface components {
              */
             feeder_code: string | null;
             /**
+             * Meter Count
+             * @description Meters on this DT in the local index; null while the index is empty.
+             */
+            meter_count: number | null;
+            /**
              * Name
              * @description Transformer display name.
              */
@@ -949,6 +1165,158 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    findMetersInBox: {
+        parameters: {
+            query: {
+                /** @description South edge in degrees. */
+                min_lat: number;
+                /** @description West edge in degrees. */
+                min_lng: number;
+                /** @description North edge in degrees. */
+                max_lat: number;
+                /** @description East edge in degrees. */
+                max_lng: number;
+                /** @description Maximum meters returned. */
+                limit?: number;
+                /** @description Case-insensitive text found in the meter id or serial. */
+                q?: string | null;
+                /** @description Installation status; repeat for any-of. */
+                status?: components["schemas"]["InstallStatus"][] | null;
+                /** @description Exact manufacturer; repeat for any-of. */
+                make?: string[] | null;
+                /** @description Electrical phase type. */
+                phase?: components["schemas"]["PhaseType"] | null;
+                /** @description Installation type. */
+                install_type?: components["schemas"]["InstallType"] | null;
+                /** @description Distribution transformer code, e.g. DT-007. */
+                dt?: string | null;
+                /** @description Feeder code, e.g. F-001. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                feeder?: string | null;
+                /** @description Substation code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                substation?: string | null;
+                /** @description Subdivision code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                subdivision?: string | null;
+                /** @description Division code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                division?: string | null;
+                /** @description Circle code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                circle?: string | null;
+                /** @description Zone code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                zone?: string | null;
+                /** @description True: only meters with a position; false: only without. */
+                has_geo?: boolean | null;
+                /** @description Sort order; ties are broken by meter id. `status` sorts alphabetically on the stored value (decommissioned, faulty, installed, unknown), not by severity. */
+                sort?: components["schemas"]["MeterSort"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BBoxResponse"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    findMetersNear: {
+        parameters: {
+            query: {
+                /** @description Centre latitude in degrees. */
+                lat: number;
+                /** @description Centre longitude in degrees. */
+                lng: number;
+                /** @description Search radius in kilometres (up to 50). */
+                radius_km?: number;
+                /** @description Maximum meters returned. */
+                limit?: number;
+                /** @description Case-insensitive text found in the meter id or serial. */
+                q?: string | null;
+                /** @description Installation status; repeat for any-of. */
+                status?: components["schemas"]["InstallStatus"][] | null;
+                /** @description Exact manufacturer; repeat for any-of. */
+                make?: string[] | null;
+                /** @description Electrical phase type. */
+                phase?: components["schemas"]["PhaseType"] | null;
+                /** @description Installation type. */
+                install_type?: components["schemas"]["InstallType"] | null;
+                /** @description Distribution transformer code, e.g. DT-007. */
+                dt?: string | null;
+                /** @description Feeder code, e.g. F-001. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                feeder?: string | null;
+                /** @description Substation code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                substation?: string | null;
+                /** @description Subdivision code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                subdivision?: string | null;
+                /** @description Division code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                division?: string | null;
+                /** @description Circle code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                circle?: string | null;
+                /** @description Zone code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                zone?: string | null;
+                /** @description True: only meters with a position; false: only without. */
+                has_geo?: boolean | null;
+                /** @description Sort order; ties are broken by meter id. `status` sorts alphabetically on the stored value (decommissioned, faulty, installed, unknown), not by severity. */
+                sort?: components["schemas"]["MeterSort"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NearResponse"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     getHealth: {
         parameters: {
             query?: never;
@@ -1001,12 +1369,38 @@ export interface operations {
     listMeters: {
         parameters: {
             query?: {
-                /** @description Search text matched against meter id and serial. */
-                q?: string | null;
                 /** @description Page number, starting at 1. */
                 page?: number;
                 /** @description Items per page (1 to 200). */
                 page_size?: number;
+                /** @description Case-insensitive text found in the meter id or serial. */
+                q?: string | null;
+                /** @description Installation status; repeat for any-of. */
+                status?: components["schemas"]["InstallStatus"][] | null;
+                /** @description Exact manufacturer; repeat for any-of. */
+                make?: string[] | null;
+                /** @description Electrical phase type. */
+                phase?: components["schemas"]["PhaseType"] | null;
+                /** @description Installation type. */
+                install_type?: components["schemas"]["InstallType"] | null;
+                /** @description Distribution transformer code, e.g. DT-007. */
+                dt?: string | null;
+                /** @description Feeder code, e.g. F-001. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                feeder?: string | null;
+                /** @description Substation code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                substation?: string | null;
+                /** @description Subdivision code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                subdivision?: string | null;
+                /** @description Division code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                division?: string | null;
+                /** @description Circle code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                circle?: string | null;
+                /** @description Zone code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                zone?: string | null;
+                /** @description True: only meters with a position; false: only without. */
+                has_geo?: boolean | null;
+                /** @description Sort order; ties are broken by meter id. `status` sorts alphabetically on the stored value (decommissioned, faulty, installed, unknown), not by severity. */
+                sort?: components["schemas"]["MeterSort"];
             };
             header?: never;
             path?: never;
@@ -1021,6 +1415,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_MeterSummary_"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation failed */
@@ -1046,6 +1449,75 @@ export interface operations {
                 headers: {
                     /** @description Seconds to wait before retrying (present when the portal gave a hint). */
                     "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getMeterFacets: {
+        parameters: {
+            query?: {
+                /** @description Field to count; repeat for several. Default: all five. */
+                field?: components["schemas"]["FacetField"][] | null;
+                /** @description Case-insensitive text found in the meter id or serial. */
+                q?: string | null;
+                /** @description Installation status; repeat for any-of. */
+                status?: components["schemas"]["InstallStatus"][] | null;
+                /** @description Exact manufacturer; repeat for any-of. */
+                make?: string[] | null;
+                /** @description Electrical phase type. */
+                phase?: components["schemas"]["PhaseType"] | null;
+                /** @description Installation type. */
+                install_type?: components["schemas"]["InstallType"] | null;
+                /** @description Distribution transformer code, e.g. DT-007. */
+                dt?: string | null;
+                /** @description Feeder code, e.g. F-001. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                feeder?: string | null;
+                /** @description Substation code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                substation?: string | null;
+                /** @description Subdivision code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                subdivision?: string | null;
+                /** @description Division code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                division?: string | null;
+                /** @description Circle code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                circle?: string | null;
+                /** @description Zone code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet. */
+                zone?: string | null;
+                /** @description True: only meters with a position; false: only without. */
+                has_geo?: boolean | null;
+                /** @description Sort order; ties are broken by meter id. `status` sorts alphabetically on the stored value (decommissioned, faulty, installed, unknown), not by severity. */
+                sort?: components["schemas"]["MeterSort"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FacetsResponse"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {
@@ -1205,7 +1677,7 @@ export interface operations {
                     "application/json": components["schemas"]["SyncRunOut"];
                 };
             };
-            /** @description A sync is already running */
+            /** @description A sync is already running, or the local index is not ready */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1324,6 +1796,81 @@ export interface operations {
             };
             /** @description Not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Portal auth or protocol failure */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Portal unavailable */
+            503: {
+                headers: {
+                    /** @description Seconds to wait before retrying (present when the portal gave a hint). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listTransformerMeters: {
+        parameters: {
+            query?: {
+                /** @description Page number, starting at 1. */
+                page?: number;
+                /** @description Items per page (1 to 200). */
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Transformer code, e.g. DT-001. */
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MeterSummary_"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
