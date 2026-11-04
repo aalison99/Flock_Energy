@@ -78,3 +78,32 @@ export const readiness = (over: Partial<S["ReadinessResponse"]> = {}): S["Readin
 export const errorBody = (code: string, message: string, details: Record<string, unknown> = {}) => ({
   error: { code, message, details },
 });
+
+export const facets = (over: S["FacetsResponse"]["facets"] = {}): S["FacetsResponse"] => ({
+  facets: {
+    status: { installed: 238, faulty: 90, decommissioned: 75 },
+    make: { HPL: 200, Secure: 150, Genus: 53 },
+    phase: { single: 277, three: 126, unknown: 0 },
+    install_type: { whole_current: 300, ct_operated: 103 },
+    dt: { "DT-007": 13, "DT-001": 20 },
+    ...over,
+  },
+});
+
+export const bboxMeter = (over: Partial<S["BBoxMeter"]> = {}): S["BBoxMeter"] => ({
+  meter_id: "J100000",
+  lat: 26.9,
+  lng: 75.8,
+  install_status: "installed",
+  dt_code: "DT-001",
+  ...over,
+});
+
+export const bboxResponse = (items: S["BBoxMeter"][], truncated = false): S["BBoxResponse"] => ({ items, truncated });
+
+export const nearMeter = (distance_km: number, over: Partial<S["MeterSummary"]> = {}): S["NearMeter"] => ({
+  meter: meterSummary(over),
+  lat: 26.91,
+  lng: 75.79,
+  distance_km,
+});

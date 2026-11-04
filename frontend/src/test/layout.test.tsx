@@ -15,14 +15,43 @@ describe("Layout + health pill", () => {
 
   it("shows breaker state and meter count when ready", async () => {
     renderApp("/");
-    expect(await screen.findByText("Portal: closed")).toBeInTheDocument();
+    expect(await screen.findByText("Portal OK")).toBeInTheDocument();
     expect(screen.getByText(/1,234 meters indexed/)).toBeInTheDocument();
   });
 
   it("shows an open breaker", async () => {
     server.use(http.get("*/api/v1/health/ready", () => HttpResponse.json(readiness({ portal: { breaker: "open" }, status: "not_ready" }))));
     renderApp("/");
-    expect(await screen.findByText("Portal: open")).toBeInTheDocument();
+    expect(await screen.findByText("Portal unavailable")).toBeInTheDocument();
+  });
+
+  it("shows a half-open breaker as recovering", async () => {
+    server.use(http.get("*/api/v1/health/ready", () => HttpResponse.json(readiness({ portal: { breaker: "half_open" } }))));
+    renderApp("/");
+    expect(await screen.findByText("Portal recovering")).toBeInTheDocument();
+  });
+
+  it("says the index is syncing when it is not ready", async () => {
+    server.use(
+      http.get("*/api/v1/health/ready", () =>
+        HttpResponse.json(readiness({ status: "not_ready", index: { ready: false, meter_count: 0, last_sync_at: null } })),
+      ),
+    );
+    renderApp("/");
+    expect(await screen.findByText("Index syncing…")).toBeInTheDocument();
+  });
+
+  it("exposes the pill as a status region with visible text", async () => {
+    renderApp("/");
+    const region = await screen.findByRole("status");
+    expect(region).toHaveTextContent("Portal OK");
+    expect(region).not.toHaveAttribute("aria-label");
+  });
+
+  it("has a skip-to-content link targeting the main region", () => {
+    renderApp("/");
+    expect(screen.getByRole("link", { name: "Skip to content" })).toHaveAttribute("href", "#main");
+    expect(screen.getByRole("main")).toHaveAttribute("id", "main");
   });
 
   it("shows API unreachable on failure", async () => {

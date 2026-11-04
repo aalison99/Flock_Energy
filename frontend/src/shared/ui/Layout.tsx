@@ -12,6 +12,12 @@ const NAV = [
 export function Layout({ headerSlot, children }: { headerSlot?: ReactNode; children: ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[2000] focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:shadow"
+      >
+        Skip to content
+      </a>
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-6">
@@ -36,7 +42,7 @@ export function Layout({ headerSlot, children }: { headerSlot?: ReactNode; child
           {headerSlot}
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <main id="main" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-6">{children}</main>
     </div>
   );
 }

@@ -1,10 +1,15 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { errorBody, meterDetail, readingSeries } from "./fixtures";
 import { currentSearch, renderApp } from "./render";
 import { server } from "./server";
+
+// Warm the lazy chart/map chunks so tests are not racing a cold module load.
+beforeAll(async () => {
+  await Promise.all([import("../features/readings/ReadingsChart"), import("../features/meters/MiniMap")]);
+}, 30_000);
 
 describe("Meter detail", () => {
   it("shows loading, then nameplate, breadcrumb, freshness and summary", async () => {

@@ -1,18 +1,28 @@
+import type { components } from "../../generated/schema";
 import { client, unwrap } from "../../lib/api-client";
-import type { MeterDetail, MeterPage } from "./types";
+import { toApiQuery } from "../../shared";
+import type { MeterFilters } from "../../shared";
+import type { FacetsResponse, MeterDetail, MeterPage } from "./types";
 
 export interface MeterListParams {
-  q?: string;
+  filters: MeterFilters;
   page: number;
   pageSize: number;
 }
 
-export function listMeters({ q, page, pageSize }: MeterListParams): Promise<MeterPage> {
+export function listMeters({ filters, page, pageSize }: MeterListParams): Promise<MeterPage> {
   return unwrap(
     client.GET("/api/v1/meters", {
-      params: { query: { q: q || undefined, page, page_size: pageSize } },
+      params: {
+        query: { ...toApiQuery(filters), sort: filters.sort as components["schemas"]["MeterSort"], page, page_size: pageSize },
+      },
     }),
   );
+}
+
+/** Counts per value for each facet field; each field's counts exclude its own filter (server side). */
+export function getFacets(filters: MeterFilters): Promise<FacetsResponse> {
+  return unwrap(client.GET("/api/v1/meters/facets", { params: { query: toApiQuery(filters) } }));
 }
 
 export function getMeter(meterId: string): Promise<MeterDetail> {
