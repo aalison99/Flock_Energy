@@ -2,8 +2,9 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.routers import health
-from app.api.v1.schemas.common import ERROR_RESPONSES
+from app.api.v1.routers import health, meters, transformers
 
-api_router = APIRouter(prefix="/api/v1", responses=ERROR_RESPONSES)
+api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router)
+api_router.include_router(meters.router)
+api_router.include_router(transformers.router)

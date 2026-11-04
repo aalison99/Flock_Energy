@@ -1,0 +1,42 @@
+"""MeterCatalog backed directly by the live portal (swapped for a local index in M6)."""
+
+import dataclasses
+
+from app.domain.exceptions import ValidationError
+from app.domain.models import Meter, PageResult
+from app.portal.interfaces import PortalClient
+from app.services.interfaces import MeterFilters
+
+PORTAL_PAGE_SIZE = 20
+_SUPPORTED_FILTERS = frozenset({"q"})
+
+
+class LiveMeterCatalog:
+    def __init__(self, portal: PortalClient) -> None:
+        self._portal = portal
+
+    async def search(self, filters: MeterFilters, page: int, page_size: int) -> PageResult[Meter]:
+        for field in dataclasses.fields(filters):
+            if field.name not in _SUPPORTED_FILTERS and getattr(filters, field.name) is not None:
+                raise ValidationError(
+                    f"filter '{field.name}' requires the local index (not built yet)",
+                    details={"filter": field.name},
+                )
+        start = (page - 1) * page_size
+        end = page * page_size
+        first_page = start // PORTAL_PAGE_SIZE + 1
+        last_page = (end - 1) // PORTAL_PAGE_SIZE + 1
+        collected: dict[int, tuple[Meter, ...]] = {}
+        total = 0
+        for portal_page in range(first_page, last_page + 1):
+            fetched = await self._portal.list_meters(portal_page, filters.q)
+            total = fetched.total
+            collected[portal_page] = fetched.items
+            if len(fetched.items) < PORTAL_PAGE_SIZE:
+                break  # the last portal page: nothing further to fetch
+        items = [meter for number in sorted(collected) for meter in collected[number]]
+        offset = (first_page - 1) * PORTAL_PAGE_SIZE
+        return PageResult(items=items[start - offset : end - offset], total=total)
+
+    async def get(self, meter_id: str) -> Meter:
+        return await self._portal.get_meter(meter_id)

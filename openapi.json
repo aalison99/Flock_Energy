@@ -5,15 +5,18 @@
         "description": "The inner object of the error envelope.",
         "properties": {
           "code": {
+            "description": "Stable machine-readable error code, e.g. not_found.",
             "title": "Code",
             "type": "string"
           },
           "details": {
             "additionalProperties": true,
+            "description": "Extra context; empty when there is none.",
             "title": "Details",
             "type": "object"
           },
           "message": {
+            "description": "Human-readable explanation.",
             "title": "Message",
             "type": "string"
           }
@@ -30,7 +33,8 @@
         "description": "The single error shape returned by every failing endpoint.",
         "properties": {
           "error": {
-            "$ref": "#/components/schemas/ErrorBody"
+            "$ref": "#/components/schemas/ErrorBody",
+            "description": "The error."
           }
         },
         "required": [
@@ -39,15 +43,38 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "GeoOut": {
+        "description": "A geographic position.",
+        "properties": {
+          "lat": {
+            "description": "Latitude in degrees.",
+            "title": "Lat",
+            "type": "number"
+          },
+          "lng": {
+            "description": "Longitude in degrees.",
+            "title": "Lng",
+            "type": "number"
+          }
+        },
+        "required": [
+          "lat",
+          "lng"
+        ],
+        "title": "GeoOut",
+        "type": "object"
+      },
       "HealthResponse": {
         "description": "Liveness probe payload.",
         "properties": {
           "status": {
             "const": "ok",
+            "description": "Always ok while the process is up.",
             "title": "Status",
             "type": "string"
           },
           "version": {
+            "description": "Application version.",
             "title": "Version",
             "type": "string"
           }
@@ -57,6 +84,515 @@
           "version"
         ],
         "title": "HealthResponse",
+        "type": "object"
+      },
+      "HierarchyLevel": {
+        "enum": [
+          "zone",
+          "circle",
+          "division",
+          "subdivision",
+          "substation",
+          "feeder",
+          "dt"
+        ],
+        "title": "HierarchyLevel",
+        "type": "string"
+      },
+      "HierarchyNodeOut": {
+        "description": "One level of the network hierarchy.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Node code; null when the portal left it blank.",
+            "title": "Code"
+          },
+          "level": {
+            "$ref": "#/components/schemas/HierarchyLevel",
+            "description": "Hierarchy level."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Node name; null when the portal left it blank.",
+            "title": "Name"
+          }
+        },
+        "required": [
+          "level",
+          "code",
+          "name"
+        ],
+        "title": "HierarchyNodeOut",
+        "type": "object"
+      },
+      "InstallStatus": {
+        "enum": [
+          "installed",
+          "faulty",
+          "decommissioned",
+          "unknown"
+        ],
+        "title": "InstallStatus",
+        "type": "string"
+      },
+      "InstallType": {
+        "enum": [
+          "whole_current",
+          "ct_operated",
+          "unknown"
+        ],
+        "title": "InstallType",
+        "type": "string"
+      },
+      "MetaOut": {
+        "description": "Provenance and freshness of the answer.",
+        "properties": {
+          "fetched_at": {
+            "description": "When the data was fetched from the portal (UTC).",
+            "format": "date-time",
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "source": {
+            "const": "portal",
+            "description": "Where the data came from.",
+            "title": "Source",
+            "type": "string"
+          },
+          "stale": {
+            "description": "True when the cached data is past its TTL and the portal could not refresh it.",
+            "title": "Stale",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "source",
+          "fetched_at",
+          "stale"
+        ],
+        "title": "MetaOut",
+        "type": "object"
+      },
+      "MeterDetail": {
+        "description": "Full meter record with hierarchy, position and freshness metadata.",
+        "example": {
+          "build": "legacy",
+          "dt_code": "DT-001",
+          "geo": {
+            "lat": 26.938961002479868,
+            "lng": 75.83095696146852
+          },
+          "hierarchy": [
+            {
+              "code": "Z-01",
+              "level": "zone",
+              "name": "Jaipur Zone 1"
+            },
+            {
+              "code": "C-01",
+              "level": "circle",
+              "name": "Circle 1"
+            },
+            {
+              "code": "D-01",
+              "level": "division",
+              "name": "Division 1"
+            },
+            {
+              "code": "SD-01",
+              "level": "subdivision",
+              "name": "Subdivision 1"
+            },
+            {
+              "code": "SS-01",
+              "level": "substation",
+              "name": "Substation 1"
+            },
+            {
+              "code": "F-001",
+              "level": "feeder",
+              "name": "Feeder 1"
+            },
+            {
+              "code": "DT-001",
+              "level": "dt",
+              "name": "Malviya Nagar DT 1"
+            }
+          ],
+          "install_status": "decommissioned",
+          "install_type": "whole_current",
+          "make": "HPL",
+          "meta": {
+            "fetched_at": "2026-11-04T12:00:00Z",
+            "source": "portal",
+            "stale": false
+          },
+          "meter_id": "J100000",
+          "phase_type": "single",
+          "serial_no": "SE33962"
+        },
+        "properties": {
+          "build": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Portal record format (legacy or v2), if known.",
+            "title": "Build"
+          },
+          "dt_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Code of the distribution transformer, if known.",
+            "title": "Dt Code"
+          },
+          "geo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GeoOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Position of the meter, if the portal has one."
+          },
+          "hierarchy": {
+            "description": "Network path from zone down to DT; empty when unavailable.",
+            "items": {
+              "$ref": "#/components/schemas/HierarchyNodeOut"
+            },
+            "title": "Hierarchy",
+            "type": "array"
+          },
+          "install_status": {
+            "$ref": "#/components/schemas/InstallStatus",
+            "description": "Installation status."
+          },
+          "install_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstallType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Installation type, if known."
+          },
+          "make": {
+            "description": "Meter manufacturer.",
+            "title": "Make",
+            "type": "string"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/MetaOut",
+            "description": "Provenance and freshness of this answer."
+          },
+          "meter_id": {
+            "description": "Portal meter id, J followed by six digits.",
+            "title": "Meter Id",
+            "type": "string"
+          },
+          "phase_type": {
+            "$ref": "#/components/schemas/PhaseType",
+            "description": "Electrical phase type."
+          },
+          "serial_no": {
+            "description": "Manufacturer serial number.",
+            "title": "Serial No",
+            "type": "string"
+          }
+        },
+        "required": [
+          "meter_id",
+          "serial_no",
+          "make",
+          "phase_type",
+          "install_status",
+          "install_type",
+          "build",
+          "dt_code",
+          "hierarchy",
+          "geo",
+          "meta"
+        ],
+        "title": "MeterDetail",
+        "type": "object"
+      },
+      "MeterSummary": {
+        "description": "A meter as shown in lists.",
+        "example": {
+          "dt_code": "DT-001",
+          "install_status": "decommissioned",
+          "make": "HPL",
+          "meter_id": "J100000",
+          "phase_type": "single",
+          "serial_no": "SE33962"
+        },
+        "properties": {
+          "dt_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Code of the distribution transformer, if known.",
+            "title": "Dt Code"
+          },
+          "install_status": {
+            "$ref": "#/components/schemas/InstallStatus",
+            "description": "Installation status."
+          },
+          "make": {
+            "description": "Meter manufacturer.",
+            "title": "Make",
+            "type": "string"
+          },
+          "meter_id": {
+            "description": "Portal meter id, J followed by six digits.",
+            "title": "Meter Id",
+            "type": "string"
+          },
+          "phase_type": {
+            "$ref": "#/components/schemas/PhaseType",
+            "description": "Electrical phase type."
+          },
+          "serial_no": {
+            "description": "Manufacturer serial number.",
+            "title": "Serial No",
+            "type": "string"
+          }
+        },
+        "required": [
+          "meter_id",
+          "serial_no",
+          "make",
+          "phase_type",
+          "install_status",
+          "dt_code"
+        ],
+        "title": "MeterSummary",
+        "type": "object"
+      },
+      "Page_MeterSummary_": {
+        "properties": {
+          "has_next": {
+            "description": "Whether a later page exists.",
+            "title": "Has Next",
+            "type": "boolean"
+          },
+          "items": {
+            "description": "The items on this page.",
+            "items": {
+              "$ref": "#/components/schemas/MeterSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "description": "Current page number, starting at 1.",
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "description": "Maximum items per page.",
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "description": "Total number of matching items.",
+            "title": "Total",
+            "type": "integer"
+          },
+          "total_pages": {
+            "description": "Total number of pages at this page size.",
+            "title": "Total Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total",
+          "total_pages",
+          "has_next"
+        ],
+        "title": "Page[MeterSummary]",
+        "type": "object"
+      },
+      "Page_TransformerOut_": {
+        "properties": {
+          "has_next": {
+            "description": "Whether a later page exists.",
+            "title": "Has Next",
+            "type": "boolean"
+          },
+          "items": {
+            "description": "The items on this page.",
+            "items": {
+              "$ref": "#/components/schemas/TransformerOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "description": "Current page number, starting at 1.",
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "description": "Maximum items per page.",
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "description": "Total number of matching items.",
+            "title": "Total",
+            "type": "integer"
+          },
+          "total_pages": {
+            "description": "Total number of pages at this page size.",
+            "title": "Total Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total",
+          "total_pages",
+          "has_next"
+        ],
+        "title": "Page[TransformerOut]",
+        "type": "object"
+      },
+      "PhaseType": {
+        "enum": [
+          "single",
+          "three",
+          "unknown"
+        ],
+        "title": "PhaseType",
+        "type": "string"
+      },
+      "PortalReadiness": {
+        "description": "State of the upstream portal as seen by the service.",
+        "properties": {
+          "breaker": {
+            "description": "Circuit breaker state of the portal client.",
+            "enum": [
+              "closed",
+              "open",
+              "half_open"
+            ],
+            "title": "Breaker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "breaker"
+        ],
+        "title": "PortalReadiness",
+        "type": "object"
+      },
+      "ReadinessResponse": {
+        "description": "Readiness probe payload; also the body of the 503 'not ready' answer.",
+        "properties": {
+          "portal": {
+            "$ref": "#/components/schemas/PortalReadiness",
+            "description": "Portal connectivity details."
+          },
+          "status": {
+            "description": "Whether the service accepts traffic.",
+            "enum": [
+              "ready",
+              "not_ready"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "portal"
+        ],
+        "title": "ReadinessResponse",
+        "type": "object"
+      },
+      "TransformerOut": {
+        "description": "A distribution transformer (DT).",
+        "example": {
+          "capacity_kva": 100,
+          "code": "DT-001",
+          "feeder_code": "F-001",
+          "name": "Malviya Nagar DT 1"
+        },
+        "properties": {
+          "capacity_kva": {
+            "description": "Rated capacity in kVA.",
+            "title": "Capacity Kva",
+            "type": "integer"
+          },
+          "code": {
+            "description": "Transformer code, e.g. DT-001.",
+            "title": "Code",
+            "type": "string"
+          },
+          "feeder_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Code of the feeder it hangs off, if known.",
+            "title": "Feeder Code"
+          },
+          "name": {
+            "description": "Transformer display name.",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "feeder_code",
+          "capacity_kva"
+        ],
+        "title": "TransformerOut",
         "type": "object"
       }
     }
@@ -69,7 +605,7 @@
   "paths": {
     "/api/v1/health": {
       "get": {
-        "operationId": "health_api_v1_health_get",
+        "operationId": "getHealth",
         "responses": {
           "200": {
             "content": {
@@ -80,26 +616,108 @@
               }
             },
             "description": "Successful Response"
-          },
-          "404": {
+          }
+        },
+        "summary": "Liveness probe",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "description": "Ready unless the portal circuit breaker is open; never calls the portal.",
+        "operationId": "getReadiness",
+        "responses": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ReadinessResponse"
                 }
               }
             },
-            "description": "Not found"
+            "description": "Successful Response"
           },
-          "409": {
+          "503": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ReadinessResponse"
                 }
               }
             },
-            "description": "Conflict or index not ready"
+            "description": "Not ready: portal breaker open"
+          }
+        },
+        "summary": "Readiness probe",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/meters": {
+      "get": {
+        "description": "Paginated meter list, optionally narrowed by a search text on id or serial.",
+        "operationId": "listMeters",
+        "parameters": [
+          {
+            "description": "Search text matched against meter id and serial.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search text matched against meter id and serial.",
+              "title": "Q"
+            }
+          },
+          {
+            "description": "Page number, starting at 1.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Page number, starting at 1.",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Items per page (1 to 200).",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Items per page (1 to 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_MeterSummary_"
+                }
+              }
+            },
+            "description": "Successful Response"
           },
           "422": {
             "content": {
@@ -110,16 +728,6 @@
               }
             },
             "description": "Validation failed"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal server error"
           },
           "502": {
             "content": {
@@ -139,12 +747,296 @@
                 }
               }
             },
-            "description": "Portal unavailable"
+            "description": "Portal unavailable",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (present when the portal gave a hint).",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
-        "summary": "Liveness probe",
+        "summary": "List meters",
         "tags": [
-          "health"
+          "meters"
+        ]
+      }
+    },
+    "/api/v1/meters/{meter_id}": {
+      "get": {
+        "description": "Full meter record with hierarchy, geo position and freshness metadata.",
+        "operationId": "getMeter",
+        "parameters": [
+          {
+            "description": "Meter id, J followed by six digits.",
+            "in": "path",
+            "name": "meter_id",
+            "required": true,
+            "schema": {
+              "description": "Meter id, J followed by six digits.",
+              "pattern": "^J\\d{6}$",
+              "title": "Meter Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeterDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portal auth or protocol failure"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portal unavailable",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (present when the portal gave a hint).",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get a meter",
+        "tags": [
+          "meters"
+        ]
+      }
+    },
+    "/api/v1/transformers": {
+      "get": {
+        "description": "Paginated transformers sorted by code, optionally filtered by feeder.",
+        "operationId": "listTransformers",
+        "parameters": [
+          {
+            "description": "Only transformers on this feeder, e.g. F-001.",
+            "in": "query",
+            "name": "feeder",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^F-\\d{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only transformers on this feeder, e.g. F-001.",
+              "title": "Feeder"
+            }
+          },
+          {
+            "description": "Page number, starting at 1.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Page number, starting at 1.",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Items per page (1 to 200).",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Items per page (1 to 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TransformerOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portal auth or protocol failure"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portal unavailable",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (present when the portal gave a hint).",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List transformers",
+        "tags": [
+          "transformers"
+        ]
+      }
+    },
+    "/api/v1/transformers/{code}": {
+      "get": {
+        "description": "One transformer by its code.",
+        "operationId": "getTransformer",
+        "parameters": [
+          {
+            "description": "Transformer code, e.g. DT-001.",
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "description": "Transformer code, e.g. DT-001.",
+              "pattern": "^DT-\\d{3}$",
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransformerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portal auth or protocol failure"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portal unavailable",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (present when the portal gave a hint).",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get a transformer",
+        "tags": [
+          "transformers"
         ]
       }
     }

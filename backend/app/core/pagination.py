@@ -3,7 +3,7 @@
 import math
 
 from fastapi import Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.domain.models import PageResult
 
@@ -14,12 +14,12 @@ MAX_PAGE_SIZE = 200
 class Page[T](BaseModel):
     """A page of items with navigation metadata."""
 
-    items: list[T]
-    page: int
-    page_size: int
-    total: int
-    total_pages: int
-    has_next: bool
+    items: list[T] = Field(description="The items on this page.")
+    page: int = Field(description="Current page number, starting at 1.")
+    page_size: int = Field(description="Maximum items per page.")
+    total: int = Field(description="Total number of matching items.")
+    total_pages: int = Field(description="Total number of pages at this page size.")
+    has_next: bool = Field(description="Whether a later page exists.")
 
 
 class PageParams:
@@ -27,8 +27,10 @@ class PageParams:
 
     def __init__(
         self,
-        page: int = Query(1, ge=1),
-        page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+        page: int = Query(1, ge=1, description="Page number, starting at 1."),
+        page_size: int = Query(
+            DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, description="Items per page (1 to 200)."
+        ),
     ) -> None:
         self.page = page
         self.page_size = page_size

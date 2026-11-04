@@ -2,10 +2,16 @@
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from enum import StrEnum
 from typing import Protocol
 
 from app.domain.models import GeoPoint, Meter, Reading, Transformer
-from app.portal.breaker import BreakerState
+
+
+class BreakerState(StrEnum):
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
 
 
 @dataclass(frozen=True, slots=True)

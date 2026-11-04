@@ -140,7 +140,7 @@ def test_openapi_documents_error_envelope(client: TestClient) -> None:
     schemas = spec["components"]["schemas"]
     assert "ErrorResponse" in schemas
     assert "HTTPValidationError" not in schemas
-    responses = spec["paths"]["/api/v1/health"]["get"]["responses"]
-    for status in ("404", "422", "500"):
+    responses = spec["paths"]["/api/v1/meters/{meter_id}"]["get"]["responses"]
+    for status in ("404", "422", "502", "503"):
         ref = responses[status]["content"]["application/json"]["schema"]["$ref"]
         assert ref.endswith("/ErrorResponse")

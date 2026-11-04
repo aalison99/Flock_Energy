@@ -3,16 +3,10 @@
 import math
 from dataclasses import dataclass
 from datetime import datetime
-from enum import StrEnum
 
 from app.core.interfaces import Clock
 from app.domain.exceptions import UpstreamUnavailableError
-
-
-class BreakerState(StrEnum):
-    CLOSED = "closed"
-    OPEN = "open"
-    HALF_OPEN = "half_open"
+from app.portal.interfaces import BreakerState
 
 
 @dataclass(frozen=True)

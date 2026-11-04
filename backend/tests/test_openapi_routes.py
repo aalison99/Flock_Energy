@@ -1,0 +1,128 @@
+"""The OpenAPI spec documents exactly the statuses each route can return."""
+
+import json
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+
+ROUTES: dict[tuple[str, str], set[str]] = {
+    ("get", "/api/v1/health"): {"200"},
+    ("get", "/api/v1/health/ready"): {"200", "503"},
+    ("get", "/api/v1/meters"): {"200", "422", "502", "503"},
+    ("get", "/api/v1/meters/{meter_id}"): {"200", "404", "422", "502", "503"},
+    ("get", "/api/v1/transformers"): {"200", "422", "502", "503"},
+    ("get", "/api/v1/transformers/{code}"): {"200", "404", "422", "502", "503"},
+}
+
+
+@pytest.fixture
+def spec(client: TestClient) -> dict[str, object]:
+    data: dict[str, object] = client.get("/openapi.json").json()
+    return data
+
+
+def test_exact_route_list(spec: Any) -> None:
+    assert {(m, p) for p, ops in spec["paths"].items() for m in ops} == set(ROUTES)
+
+
+@pytest.mark.parametrize(("method", "path"), sorted(ROUTES))
+def test_statuses_per_route(spec: Any, method: str, path: str) -> None:
+    assert set(spec["paths"][path][method]["responses"]) == ROUTES[(method, path)]
+
+
+def test_error_envelope_referenced_and_no_default_validation_model(spec: dict[str, object]) -> None:
+    text = json.dumps(spec)
+    assert "#/components/schemas/ErrorResponse" in text
+    assert "HTTPValidationError" not in text
+    assert "ValidationError" not in json.dumps(spec["components"]).replace("validation_error", "")
+
+
+def test_readiness_503_uses_the_readiness_body(
+    spec: dict[
+        str, dict[str, dict[str, dict[str, dict[str, dict[str, dict[str, dict[str, str]]]]]]]
+    ],
+) -> None:
+    ref = spec["paths"]["/api/v1/health/ready"]["get"]["responses"]["503"]["content"][
+        "application/json"
+    ]["schema"]["$ref"]
+    assert ref.endswith("/ReadinessResponse")
+
+
+def _schemas(spec: Any) -> dict[str, Any]:
+    out: dict[str, Any] = spec["components"]["schemas"]
+    return out
+
+
+def _enum_of(spec: Any, model: str, field: str) -> list[str]:
+    schemas = _schemas(spec)
+    prop = schemas[model]["properties"][field]
+    for option in [prop, *prop.get("anyOf", [])]:
+        ref = option.get("$ref")
+        target = schemas[ref.rsplit("/", 1)[1]] if ref else option
+        if "enum" in target:
+            found: list[str] = target["enum"]
+            return found
+    raise AssertionError(f"{model}.{field} has no enum")
+
+
+def test_enum_values_are_in_the_spec(spec: Any) -> None:
+    phase = ["single", "three", "unknown"]
+    status = ["installed", "faulty", "decommissioned", "unknown"]
+    levels = ["zone", "circle", "division", "subdivision", "substation", "feeder", "dt"]
+    for model in ("MeterSummary", "MeterDetail"):
+        assert _enum_of(spec, model, "phase_type") == phase
+        assert _enum_of(spec, model, "install_status") == status
+    assert _enum_of(spec, "MeterDetail", "install_type") == [
+        "whole_current",
+        "ct_operated",
+        "unknown",
+    ]
+    assert _enum_of(spec, "HierarchyNodeOut", "level") == levels
+    assert _enum_of(spec, "PortalReadiness", "breaker") == ["closed", "open", "half_open"]
+
+
+def test_operation_ids(spec: Any) -> None:
+    ids = {(m, p): op["operationId"] for p, ops in spec["paths"].items() for m, op in ops.items()}
+    assert ids == {
+        ("get", "/api/v1/health"): "getHealth",
+        ("get", "/api/v1/health/ready"): "getReadiness",
+        ("get", "/api/v1/meters"): "listMeters",
+        ("get", "/api/v1/meters/{meter_id}"): "getMeter",
+        ("get", "/api/v1/transformers"): "listTransformers",
+        ("get", "/api/v1/transformers/{code}"): "getTransformer",
+    }
+
+
+def test_retry_after_header_documented_on_error_503s(spec: Any) -> None:
+    for (method, path), statuses in ROUTES.items():
+        if path.endswith("/ready") or "503" not in statuses:
+            continue
+        header = spec["paths"][path][method]["responses"]["503"]["headers"]["Retry-After"]
+        assert header["schema"] == {"type": "integer"}
+        assert header["description"]
+
+
+def test_every_field_and_param_is_described(spec: Any) -> None:
+    for name, schema in _schemas(spec).items():
+        for field, prop in schema.get("properties", {}).items():
+            assert prop.get("description"), f"{name}.{field}"
+    for ops in spec["paths"].values():
+        for op in ops.values():
+            for param in op.get("parameters", []):
+                assert param.get("description"), param["name"]
+
+
+def test_examples_validate_against_their_models() -> None:
+    from app.api.v1.schemas.meters import MeterDetail, MeterSummary
+    from app.api.v1.schemas.transformers import TransformerOut
+
+    for model in (MeterDetail, MeterSummary, TransformerOut):
+        extra: Any = model.model_config["json_schema_extra"]
+        model.model_validate(extra["example"])
+
+
+def test_breaker_literal_matches_the_breaker_enum(spec: Any) -> None:
+    from app.portal.interfaces import BreakerState
+
+    assert set(_enum_of(spec, "PortalReadiness", "breaker")) == {s.value for s in BreakerState}
