@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/v1/data-quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the data-quality report
+         * @description Findings from every registered check over the indexed data: name conflicts, repaired blanks, DT mismatches, missing or outlying positions. `summary` counts all issues per check regardless of filters. Needs the local index.
+         */
+        get: operations["getDataQualityReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/geo/bbox": {
         parameters: {
             query?: never;
@@ -73,6 +93,66 @@ export interface paths {
          * @description Ready unless the portal circuit breaker is open; never calls the portal. Also reports the local index (an empty index is reported, not a failure).
          */
         get: operations["getReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hierarchy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the network hierarchy tree
+         * @description Zone, circle, division, subdivision, substation, feeder and DT, rebuilt from the indexed meters. Nodes are identified by their full code path. Needs the local index.
+         */
+        get: operations["getHierarchyTree"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hierarchy/node": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one hierarchy node
+         * @description A node with its path from the zone, children, meter counts and alias names.
+         */
+        get: operations["getHierarchyNode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hierarchy/node/meters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the meters under a hierarchy node
+         * @description Paginated meters in the node's whole subtree, ordered by meter id.
+         */
+        get: operations["listHierarchyNodeMeters"];
         put?: never;
         post?: never;
         delete?: never;
@@ -266,6 +346,22 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AltNameOut
+         * @description A non-canonical name seen for the node.
+         */
+        AltNameOut: {
+            /**
+             * Meter Ids
+             * @description Meters that used this name.
+             */
+            meter_ids: string[];
+            /**
+             * Name
+             * @description The alternative name.
+             */
+            name: string;
+        };
+        /**
          * BBoxMeter
          * @description A meter inside a bounding box (the slim shape a map needs).
          */
@@ -320,6 +416,72 @@ export interface components {
              * @description True when more meters matched than `limit` allowed.
              */
             truncated: boolean;
+        };
+        /**
+         * CheckOut
+         * @description One registered check.
+         */
+        CheckOut: {
+            /**
+             * Description
+             * @description What the check looks for.
+             */
+            description: string;
+            /**
+             * Id
+             * @description Check id, usable as the `check` filter.
+             */
+            id: string;
+            /** @description How serious an issue from this check is. */
+            severity: components["schemas"]["Severity"];
+        };
+        /**
+         * DataQualityResponse
+         * @description A page of issues plus unfiltered counts per check.
+         */
+        DataQualityResponse: {
+            /**
+             * Checks
+             * @description Every registered check.
+             */
+            checks: components["schemas"]["CheckOut"][];
+            /**
+             * Has Next
+             * @description Whether a later page exists.
+             */
+            has_next: boolean;
+            /**
+             * Items
+             * @description The items on this page.
+             */
+            items: components["schemas"]["IssueOut"][];
+            /**
+             * Page
+             * @description Current page number, starting at 1.
+             */
+            page: number;
+            /**
+             * Page Size
+             * @description Maximum items per page.
+             */
+            page_size: number;
+            /**
+             * Summary
+             * @description Issue count per check id over all data, ignoring the filters.
+             */
+            summary: {
+                [key: string]: number;
+            };
+            /**
+             * Total
+             * @description Total number of matching items.
+             */
+            total: number;
+            /**
+             * Total Pages
+             * @description Total number of pages at this page size.
+             */
+            total_pages: number;
         };
         /**
          * ErrorBody
@@ -473,6 +635,41 @@ export interface components {
          * @enum {string}
          */
         InstallType: "whole_current" | "ct_operated" | "unknown";
+        /**
+         * IssueOut
+         * @description One finding.
+         */
+        IssueOut: {
+            /**
+             * Check
+             * @description Id of the check that found it.
+             */
+            check: string;
+            /**
+             * Entity
+             * @description Kind of entity concerned: meter, transformer or node.
+             */
+            entity: string;
+            /**
+             * Entity Id
+             * @description Meter id, DT code or hierarchy node id.
+             */
+            entity_id: string;
+            /**
+             * Evidence
+             * @description Check-specific facts behind the finding.
+             */
+            evidence: {
+                [key: string]: unknown;
+            };
+            /**
+             * Message
+             * @description Human-readable summary.
+             */
+            message: string;
+            /** @description Severity of the check. */
+            severity: components["schemas"]["Severity"];
+        };
         /**
          * MetaOut
          * @description Provenance and freshness of the answer.
@@ -675,6 +872,117 @@ export interface components {
              * @description Meters ordered by distance, then meter id.
              */
             items: components["schemas"]["NearMeter"][];
+        };
+        /**
+         * NodeDetailOut
+         * @description One node with its path from the zone, children, counts and alias names.
+         * @example {
+         *       "alt_names": [
+         *         {
+         *           "meter_ids": [
+         *             "J100400",
+         *             "J100401"
+         *           ],
+         *           "name": "Old Malviya Nagar Xfmr"
+         *         }
+         *       ],
+         *       "children": [],
+         *       "code": "DT-007",
+         *       "id": "Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007",
+         *       "level": "dt",
+         *       "meter_count": 13,
+         *       "name": "Sanganer DT 7",
+         *       "path": [
+         *         {
+         *           "code": "Z-01",
+         *           "id": "Z-01",
+         *           "level": "zone",
+         *           "meter_count": 120,
+         *           "name": "Jaipur Zone 1"
+         *         }
+         *       ],
+         *       "status_breakdown": {
+         *         "decommissioned": 2,
+         *         "faulty": 4,
+         *         "installed": 7,
+         *         "unknown": 0
+         *       },
+         *       "unplaced_count": 0
+         *     }
+         */
+        NodeDetailOut: {
+            /**
+             * Alt Names
+             * @description Other names used for this node.
+             */
+            alt_names: components["schemas"]["AltNameOut"][];
+            /**
+             * Children
+             * @description Child nodes sorted by code.
+             */
+            children: components["schemas"]["NodeSummaryOut"][];
+            /**
+             * Code
+             * @description Node code.
+             */
+            code: string;
+            /**
+             * Id
+             * @description Node id: the codes from zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007.
+             */
+            id: string;
+            /** @description Hierarchy level. */
+            level: components["schemas"]["HierarchyLevel"];
+            /**
+             * Meter Count
+             * @description Meters in this node's whole subtree.
+             */
+            meter_count: number;
+            /**
+             * Name
+             * @description Canonical node name.
+             */
+            name: string;
+            /**
+             * Path
+             * @description Zone down to this node, inclusive.
+             */
+            path: components["schemas"]["NodeSummaryOut"][];
+            /** @description Subtree meters per status. */
+            status_breakdown: components["schemas"]["StatusBreakdown"];
+            /**
+             * Unplaced Count
+             * @description Meters attached here because a lower level was unfixable.
+             */
+            unplaced_count: number;
+        };
+        /**
+         * NodeSummaryOut
+         * @description A node without children: a step on the path or a child in a listing.
+         */
+        NodeSummaryOut: {
+            /**
+             * Code
+             * @description Node code.
+             */
+            code: string;
+            /**
+             * Id
+             * @description Node id: the codes from zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007.
+             */
+            id: string;
+            /** @description Hierarchy level. */
+            level: components["schemas"]["HierarchyLevel"];
+            /**
+             * Meter Count
+             * @description Meters in the node's whole subtree.
+             */
+            meter_count: number;
+            /**
+             * Name
+             * @description Canonical node name.
+             */
+            name: string;
         };
         /** Page[MeterSummary] */
         Page_MeterSummary_: {
@@ -999,6 +1307,37 @@ export interface components {
          */
         Resolution: "raw" | "hourly" | "daily";
         /**
+         * Severity
+         * @enum {string}
+         */
+        Severity: "info" | "warning" | "error";
+        /**
+         * StatusBreakdown
+         * @description Meters per installation status.
+         */
+        StatusBreakdown: {
+            /**
+             * Decommissioned
+             * @description Meters with status decommissioned.
+             */
+            decommissioned: number;
+            /**
+             * Faulty
+             * @description Meters with status faulty.
+             */
+            faulty: number;
+            /**
+             * Installed
+             * @description Meters with status installed.
+             */
+            installed: number;
+            /**
+             * Unknown
+             * @description Meters whose status is unknown.
+             */
+            unknown: number;
+        };
+        /**
          * SyncRequest
          * @description Options for a sync run.
          * @example {
@@ -1156,6 +1495,57 @@ export interface components {
              */
             name: string;
         };
+        /**
+         * TreeNodeOut
+         * @description A hierarchy node, its subtree totals and its children (down to the requested depth).
+         */
+        TreeNodeOut: {
+            /**
+             * Children
+             * @description Child nodes sorted by code; empty at the depth limit and at DTs.
+             */
+            children: components["schemas"]["TreeNodeOut"][];
+            /**
+             * Code
+             * @description Node code, e.g. D-07.
+             */
+            code: string;
+            /**
+             * Id
+             * @description Node id: the codes from zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007.
+             */
+            id: string;
+            /** @description Hierarchy level. */
+            level: components["schemas"]["HierarchyLevel"];
+            /**
+             * Meter Count
+             * @description Meters in this node's whole subtree.
+             */
+            meter_count: number;
+            /**
+             * Name
+             * @description Canonical node name.
+             */
+            name: string;
+            /** @description Subtree meters per status. */
+            status_breakdown: components["schemas"]["StatusBreakdown"];
+            /**
+             * Unplaced Count
+             * @description Meters attached here because a lower level was unfixable.
+             */
+            unplaced_count: number;
+        };
+        /**
+         * TreeResponse
+         * @description The hierarchy tree: one entry per zone.
+         */
+        TreeResponse: {
+            /**
+             * Items
+             * @description Zones, sorted by code.
+             */
+            items: components["schemas"]["TreeNodeOut"][];
+        };
     };
     responses: never;
     parameters: never;
@@ -1165,6 +1555,53 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getDataQualityReport: {
+        parameters: {
+            query?: {
+                /** @description Only issues from this check id. */
+                check?: string | null;
+                /** @description Only issues of this severity. */
+                severity?: components["schemas"]["Severity"] | null;
+                /** @description Page number, starting at 1. */
+                page?: number;
+                /** @description Items per page (1 to 200). */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataQualityResponse"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     findMetersInBox: {
         parameters: {
             query: {
@@ -1362,6 +1799,151 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+        };
+    };
+    getHierarchyTree: {
+        parameters: {
+            query?: {
+                /** @description Levels to include: 1 = zones only, 7 = down to DTs. */
+                depth?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TreeResponse"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getHierarchyNode: {
+        parameters: {
+            query: {
+                /** @description Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes. */
+                id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeDetailOut"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listHierarchyNodeMeters: {
+        parameters: {
+            query: {
+                /** @description Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes. */
+                id: string;
+                /** @description Page number, starting at 1. */
+                page?: number;
+                /** @description Items per page (1 to 200). */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MeterSummary_"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
