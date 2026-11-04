@@ -13,6 +13,7 @@ def test_list_envelope(api: Api) -> None:
         "name": "Malviya Nagar DT 1",
         "feeder_code": "F-001",
         "capacity_kva": 100,
+        "meter_count": None,
     }
     codes = [t["code"] for t in body["items"]]
     assert codes == sorted(codes)
@@ -49,6 +50,7 @@ def test_detail(api: Api) -> None:
         "name": "Mansarovar DT 2",
         "feeder_code": "F-002",
         "capacity_kva": 63,
+        "meter_count": None,
     }
 
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
-from app.domain.models import GeoPoint, Meter, SyncRun
+from app.domain.models import GeoPoint, Meter, SyncRun, Transformer
 from app.portal.interfaces import BreakerState
 from app.services.readings.buckets import Bucket, Resolution
 from app.services.readings.series import IntervalKind, IntervalPoint
@@ -14,7 +14,7 @@ from app.services.readings.series import IntervalKind, IntervalPoint
 class Meta:
     """Where an answer came from and how fresh it is."""
 
-    source: Literal["portal"]
+    source: Literal["portal", "index"]
     fetched_at: datetime
     stale: bool
 
@@ -24,6 +24,14 @@ class MeterDetailResult:
     meter: Meter
     geo: GeoPoint | None
     meta: Meta
+
+
+@dataclass(frozen=True)
+class TransformerView:
+    """A transformer plus how many indexed meters hang off it (None: index not ready)."""
+
+    transformer: Transformer
+    meter_count: int | None
 
 
 @dataclass(frozen=True)

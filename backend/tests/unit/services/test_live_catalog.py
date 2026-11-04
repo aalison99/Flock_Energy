@@ -1,12 +1,17 @@
-from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 
-from app.domain.exceptions import NotFoundError, ValidationError
+from app.domain.exceptions import (
+    FilterRequiresIndexError,
+    IndexNotReadyError,
+    NotFoundError,
+    ValidationError,
+)
+from app.domain.models import InstallStatus, PhaseType
 from app.portal.fake import FakePortalClient
 from app.services.catalogs.live_catalog import LiveMeterCatalog
-from app.services.interfaces import MeterFilters
+from app.services.interfaces import FacetField, MeterFilters, MeterSort
 from tests.support.portal_emulator import FIXTURES
 
 FIXTURES_DIR: Path = FIXTURES
@@ -94,33 +99,52 @@ async def test_q_is_passed_through(catalog: LiveMeterCatalog, portal: FakePortal
     assert portal.calls == [("list_meters", (1, "se33962"))]
 
 
-@dataclass(frozen=True)
-class _MoreFilters(MeterFilters):
-    dt_code: str | None = None
-
-
 @pytest.mark.anyio
-async def test_a_filter_other_than_q_is_rejected(
-    catalog: LiveMeterCatalog, portal: FakePortalClient
+@pytest.mark.parametrize(
+    ("filters", "name"),
+    [
+        (MeterFilters(dt="DT-001"), "dt"),
+        (MeterFilters(status=(InstallStatus.FAULTY,)), "status"),
+        (MeterFilters(make=("HPL",)), "make"),
+        (MeterFilters(phase=PhaseType.THREE), "phase"),
+        (MeterFilters(has_geo=False), "has_geo"),
+        (MeterFilters(zone="Z-01"), "zone"),
+        (MeterFilters(sort=MeterSort.MAKE), "sort"),
+        (MeterFilters(q="se", sort=MeterSort.METER_ID_DESC), "sort"),
+    ],
+)
+async def test_a_filter_other_than_q_or_a_non_default_sort_is_rejected(
+    catalog: LiveMeterCatalog, portal: FakePortalClient, filters: MeterFilters, name: str
 ) -> None:
     with pytest.raises(ValidationError) as info:
-        await catalog.search(_MoreFilters(dt_code="DT-001"), 1, 50)
-    assert info.value.message == "filter 'dt_code' requires the local index (not built yet)"
-    assert info.value.details == {"filter": "dt_code"}
+        await catalog.search(filters, 1, 50)
+    assert info.value.message == f"filter '{name}' requires the local index (not built yet)"
+    assert isinstance(info.value, FilterRequiresIndexError)
+    assert info.value.details == {"filter": name}
     assert portal.calls == []
 
 
 @pytest.mark.anyio
-async def test_unset_extra_filter_is_fine(catalog: LiveMeterCatalog) -> None:
-    result = await catalog.search(_MoreFilters(q="se33962"), 1, 50)
+async def test_q_with_the_default_sort_is_fine(catalog: LiveMeterCatalog) -> None:
+    result = await catalog.search(MeterFilters(q="se33962", sort=MeterSort.METER_ID), 1, 50)
     assert result.total == 1
 
 
 @pytest.mark.anyio
-async def test_get_delegates_and_not_found_propagates(catalog: LiveMeterCatalog) -> None:
-    assert (await catalog.get("J100000")).serial_no == "SE33962"
+async def test_get_returns_a_portal_hit_and_not_found_propagates(
+    catalog: LiveMeterCatalog,
+) -> None:
+    hit = await catalog.get("J100000")
+    assert hit.meter.serial_no == "SE33962"
+    assert (hit.source, hit.synced_at) == ("portal", None)
     with pytest.raises(NotFoundError):
         await catalog.get("J999999")
+
+
+@pytest.mark.anyio
+async def test_facets_require_the_index(catalog: LiveMeterCatalog) -> None:
+    with pytest.raises(IndexNotReadyError, match="facets require the local index"):
+        await catalog.facets(MeterFilters(), [FacetField.STATUS])
 
 
 @pytest.mark.anyio

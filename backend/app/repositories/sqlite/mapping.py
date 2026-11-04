@@ -43,6 +43,11 @@ def _parse(text: str) -> datetime:
     return datetime.fromisoformat(text)
 
 
+def parse_time(text: str) -> datetime:
+    """Read back a stored timestamp (UTC for `synced_at`)."""
+    return _parse(text)
+
+
 # --- meters -----------------------------------------------------------------------------------
 
 

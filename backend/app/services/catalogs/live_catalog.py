@@ -1,14 +1,16 @@
-"""MeterCatalog backed directly by the live portal (swapped for a local index in M6)."""
+"""MeterCatalog backed directly by the live portal (serves only `q` and the default sort)."""
 
 import dataclasses
+from collections.abc import Sequence
 
-from app.domain.exceptions import ValidationError
+from app.domain.exceptions import FilterRequiresIndexError, IndexNotReadyError
 from app.domain.models import Meter, PageResult
 from app.portal.interfaces import PortalClient
-from app.services.interfaces import MeterFilters
+from app.services.interfaces import CatalogHit, FacetField, MeterFilters
 
 PORTAL_PAGE_SIZE = 20
 _SUPPORTED_FILTERS = frozenset({"q"})
+_DEFAULTS = MeterFilters()
 
 
 class LiveMeterCatalog:
@@ -17,8 +19,9 @@ class LiveMeterCatalog:
 
     async def search(self, filters: MeterFilters, page: int, page_size: int) -> PageResult[Meter]:
         for field in dataclasses.fields(filters):
-            if field.name not in _SUPPORTED_FILTERS and getattr(filters, field.name) is not None:
-                raise ValidationError(
+            unsupported = field.name not in _SUPPORTED_FILTERS
+            if unsupported and getattr(filters, field.name) != getattr(_DEFAULTS, field.name):
+                raise FilterRequiresIndexError(
                     f"filter '{field.name}' requires the local index (not built yet)",
                     details={"filter": field.name},
                 )
@@ -38,5 +41,10 @@ class LiveMeterCatalog:
         offset = (first_page - 1) * PORTAL_PAGE_SIZE
         return PageResult(items=items[start - offset : end - offset], total=total)
 
-    async def get(self, meter_id: str) -> Meter:
-        return await self._portal.get_meter(meter_id)
+    async def get(self, meter_id: str) -> CatalogHit:
+        return CatalogHit(await self._portal.get_meter(meter_id), "portal", None)
+
+    async def facets(
+        self, filters: MeterFilters, fields: Sequence[FacetField]
+    ) -> dict[FacetField, dict[str, int]]:
+        raise IndexNotReadyError("facets require the local index")

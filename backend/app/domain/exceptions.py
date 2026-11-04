@@ -19,6 +19,10 @@ class ValidationError(DomainError):
     code = "validation_error"
 
 
+class FilterRequiresIndexError(ValidationError):
+    """A filter or sort the live portal cannot serve; only the local index can."""
+
+
 class NotFoundError(DomainError):
     code = "not_found"
 

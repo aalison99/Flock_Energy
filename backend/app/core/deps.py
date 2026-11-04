@@ -35,7 +35,10 @@ from app.repositories.sqlite.reading_repo import SqliteReadingRepository
 from app.repositories.sqlite.store import SqliteIndexStore
 from app.repositories.sqlite.sync_repo import SqliteSyncRepository
 from app.repositories.sqlite.transformer_repo import SqliteTransformerRepository
+from app.services.catalogs.indexed_catalog import IndexedMeterCatalog
 from app.services.catalogs.live_catalog import LiveMeterCatalog
+from app.services.catalogs.prefer_index import PreferIndexCatalog
+from app.services.geo_service import GeoService
 from app.services.health_service import HealthService
 from app.services.interfaces import IndexStatusReader, MeterCatalog
 from app.services.meter_service import MeterService
@@ -155,9 +158,28 @@ def get_breaker_state(request: Request) -> BreakerStateReader:
     return breaker
 
 
-def get_meter_catalog(portal: Annotated[PortalClient, Depends(get_portal)]) -> MeterCatalog:
-    # M6: swap this one line for the local-index catalog.
-    return LiveMeterCatalog(portal)
+async def get_db_connection(request: Request) -> AsyncIterator[AsyncConnection]:
+    """One transaction per request: commit on success, roll back on error.
+
+    Used with scope="function" so the commit happens before the response is sent.
+    """
+    engine: AsyncEngine = request.app.state.db_engine
+    async with engine.begin() as conn:
+        yield conn
+
+
+def get_meter_repository(
+    conn: Annotated[AsyncConnection, Depends(get_db_connection, scope="function")],
+) -> MeterRepository:
+    return SqliteMeterRepository(conn)
+
+
+def get_meter_catalog(
+    repo: Annotated[MeterRepository, Depends(get_meter_repository)],
+    portal: Annotated[PortalClient, Depends(get_portal)],
+) -> MeterCatalog:
+    # The one line that picks the catalog: the index, falling back to the live portal.
+    return PreferIndexCatalog(IndexedMeterCatalog(repo), LiveMeterCatalog(portal))
 
 
 def get_meter_service(
@@ -165,8 +187,15 @@ def get_meter_service(
     portal: Annotated[PortalClient, Depends(get_portal)],
     freshness: Annotated[FreshnessReader, Depends(get_freshness)],
     clock: Annotated[Clock, Depends(get_clock)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> MeterService:
-    return MeterService(catalog, portal, freshness, clock)
+    return MeterService(catalog, portal, freshness, clock, settings.index_max_age_s)
+
+
+def get_geo_service(
+    repo: Annotated[MeterRepository, Depends(get_meter_repository)],
+) -> GeoService:
+    return GeoService(repo)
 
 
 def get_reading_service(
@@ -179,8 +208,9 @@ def get_reading_service(
 
 def get_transformer_service(
     portal: Annotated[PortalClient, Depends(get_portal)],
+    catalog: Annotated[MeterCatalog, Depends(get_meter_catalog)],
 ) -> TransformerService:
-    return TransformerService(portal)
+    return TransformerService(portal, catalog)
 
 
 def get_index_store(request: Request) -> IndexStore:
@@ -207,22 +237,6 @@ def get_health_service(
     index: Annotated[IndexStatusReader, Depends(get_sync_service)],
 ) -> HealthService:
     return HealthService(breaker, index)
-
-
-async def get_db_connection(request: Request) -> AsyncIterator[AsyncConnection]:
-    """One transaction per request: commit on success, roll back on error.
-
-    Used with scope="function" so the commit happens before the response is sent.
-    """
-    engine: AsyncEngine = request.app.state.db_engine
-    async with engine.begin() as conn:
-        yield conn
-
-
-def get_meter_repository(
-    conn: Annotated[AsyncConnection, Depends(get_db_connection, scope="function")],
-) -> MeterRepository:
-    return SqliteMeterRepository(conn)
 
 
 def get_transformer_repository(

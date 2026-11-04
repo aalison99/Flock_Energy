@@ -1,6 +1,87 @@
 {
   "components": {
     "schemas": {
+      "BBoxMeter": {
+        "description": "A meter inside a bounding box (the slim shape a map needs).",
+        "properties": {
+          "dt_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Code of the distribution transformer, if known.",
+            "title": "Dt Code"
+          },
+          "install_status": {
+            "$ref": "#/components/schemas/InstallStatus",
+            "description": "Installation status."
+          },
+          "lat": {
+            "description": "Latitude in degrees.",
+            "title": "Lat",
+            "type": "number"
+          },
+          "lng": {
+            "description": "Longitude in degrees.",
+            "title": "Lng",
+            "type": "number"
+          },
+          "meter_id": {
+            "description": "Portal meter id, J followed by six digits.",
+            "title": "Meter Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "meter_id",
+          "lat",
+          "lng",
+          "install_status",
+          "dt_code"
+        ],
+        "title": "BBoxMeter",
+        "type": "object"
+      },
+      "BBoxResponse": {
+        "description": "Meters inside a bounding box.",
+        "example": {
+          "items": [
+            {
+              "dt_code": "DT-001",
+              "install_status": "decommissioned",
+              "lat": 26.938961002479868,
+              "lng": 75.83095696146852,
+              "meter_id": "J100000"
+            }
+          ],
+          "truncated": false
+        },
+        "properties": {
+          "items": {
+            "description": "Meters by meter id, at most `limit`.",
+            "items": {
+              "$ref": "#/components/schemas/BBoxMeter"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "truncated": {
+            "description": "True when more meters matched than `limit` allowed.",
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "truncated"
+        ],
+        "title": "BBoxResponse",
+        "type": "object"
+      },
       "ErrorBody": {
         "description": "The inner object of the error envelope.",
         "properties": {
@@ -41,6 +122,52 @@
           "error"
         ],
         "title": "ErrorResponse",
+        "type": "object"
+      },
+      "FacetField": {
+        "description": "Meter attributes that can be counted.",
+        "enum": [
+          "status",
+          "make",
+          "phase",
+          "install_type",
+          "dt"
+        ],
+        "title": "FacetField",
+        "type": "string"
+      },
+      "FacetsResponse": {
+        "description": "Meter counts per attribute value, for building filter chips.",
+        "example": {
+          "facets": {
+            "phase": {
+              "single": 277,
+              "three": 126
+            },
+            "status": {
+              "decommissioned": 75,
+              "faulty": 90,
+              "installed": 238
+            }
+          }
+        },
+        "properties": {
+          "facets": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "description": "For each requested field, the count of matching meters per value. Each field's counts apply every filter except that field's own; zero counts are omitted.",
+            "title": "Facets",
+            "type": "object"
+          }
+        },
+        "required": [
+          "facets"
+        ],
+        "title": "FacetsResponse",
         "type": "object"
       },
       "GeoOut": {
@@ -197,19 +324,22 @@
         "description": "Provenance and freshness of the answer.",
         "properties": {
           "fetched_at": {
-            "description": "When the data was fetched from the portal (UTC).",
+            "description": "When the data was fetched from the portal or last synced into the index (UTC).",
             "format": "date-time",
             "title": "Fetched At",
             "type": "string"
           },
           "source": {
-            "const": "portal",
-            "description": "Where the data came from.",
+            "description": "Where the data came from: the live portal or the local index.",
+            "enum": [
+              "portal",
+              "index"
+            ],
             "title": "Source",
             "type": "string"
           },
           "stale": {
-            "description": "True when the cached data is past its TTL and the portal could not refresh it.",
+            "description": "True when the data is older than its freshness limit (portal cache TTL, or the index's maximum age).",
             "title": "Stale",
             "type": "boolean"
           }
@@ -379,6 +509,17 @@
         "title": "MeterDetail",
         "type": "object"
       },
+      "MeterSort": {
+        "description": "Sort keys for meter lists; ties are always broken by meter_id.",
+        "enum": [
+          "meter_id",
+          "-meter_id",
+          "make",
+          "status"
+        ],
+        "title": "MeterSort",
+        "type": "string"
+      },
       "MeterSummary": {
         "description": "A meter as shown in lists.",
         "example": {
@@ -435,6 +576,56 @@
           "dt_code"
         ],
         "title": "MeterSummary",
+        "type": "object"
+      },
+      "NearMeter": {
+        "description": "A meter found near a point, with its position and distance.",
+        "properties": {
+          "distance_km": {
+            "description": "Great-circle distance from the search point in km.",
+            "title": "Distance Km",
+            "type": "number"
+          },
+          "lat": {
+            "description": "Latitude in degrees.",
+            "title": "Lat",
+            "type": "number"
+          },
+          "lng": {
+            "description": "Longitude in degrees.",
+            "title": "Lng",
+            "type": "number"
+          },
+          "meter": {
+            "$ref": "#/components/schemas/MeterSummary",
+            "description": "The meter."
+          }
+        },
+        "required": [
+          "meter",
+          "lat",
+          "lng",
+          "distance_km"
+        ],
+        "title": "NearMeter",
+        "type": "object"
+      },
+      "NearResponse": {
+        "description": "Meters within a radius, nearest first.",
+        "properties": {
+          "items": {
+            "description": "Meters ordered by distance, then meter id.",
+            "items": {
+              "$ref": "#/components/schemas/NearMeter"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "NearResponse",
         "type": "object"
       },
       "Page_MeterSummary_": {
@@ -1182,6 +1373,7 @@
           "capacity_kva": 100,
           "code": "DT-001",
           "feeder_code": "F-001",
+          "meter_count": 10,
           "name": "Malviya Nagar DT 1"
         },
         "properties": {
@@ -1207,6 +1399,18 @@
             "description": "Code of the feeder it hangs off, if known.",
             "title": "Feeder Code"
           },
+          "meter_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Meters on this DT in the local index; null while the index is empty.",
+            "title": "Meter Count"
+          },
           "name": {
             "description": "Transformer display name.",
             "title": "Name",
@@ -1217,7 +1421,8 @@
           "code",
           "name",
           "feeder_code",
-          "capacity_kva"
+          "capacity_kva",
+          "meter_count"
         ],
         "title": "TransformerOut",
         "type": "object"
@@ -1230,6 +1435,738 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/geo/bbox": {
+      "get": {
+        "description": "Meters with a position inside the inclusive box, by meter id. Needs the local index. A box crossing the antimeridian is not supported.",
+        "operationId": "findMetersInBox",
+        "parameters": [
+          {
+            "description": "South edge in degrees.",
+            "in": "query",
+            "name": "min_lat",
+            "required": true,
+            "schema": {
+              "description": "South edge in degrees.",
+              "maximum": 90,
+              "minimum": -90,
+              "title": "Min Lat",
+              "type": "number"
+            }
+          },
+          {
+            "description": "West edge in degrees.",
+            "in": "query",
+            "name": "min_lng",
+            "required": true,
+            "schema": {
+              "description": "West edge in degrees.",
+              "maximum": 180,
+              "minimum": -180,
+              "title": "Min Lng",
+              "type": "number"
+            }
+          },
+          {
+            "description": "North edge in degrees.",
+            "in": "query",
+            "name": "max_lat",
+            "required": true,
+            "schema": {
+              "description": "North edge in degrees.",
+              "maximum": 90,
+              "minimum": -90,
+              "title": "Max Lat",
+              "type": "number"
+            }
+          },
+          {
+            "description": "East edge in degrees.",
+            "in": "query",
+            "name": "max_lng",
+            "required": true,
+            "schema": {
+              "description": "East edge in degrees.",
+              "maximum": 180,
+              "minimum": -180,
+              "title": "Max Lng",
+              "type": "number"
+            }
+          },
+          {
+            "description": "Maximum meters returned.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 1000,
+              "description": "Maximum meters returned.",
+              "maximum": 2000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Case-insensitive text found in the meter id or serial.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive text found in the meter id or serial.",
+              "title": "Q"
+            }
+          },
+          {
+            "description": "Installation status; repeat for any-of.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/InstallStatus"
+                  },
+                  "maxItems": 10,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Installation status; repeat for any-of.",
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Exact manufacturer; repeat for any-of.",
+            "in": "query",
+            "name": "make",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "maxLength": 32,
+                    "type": "string"
+                  },
+                  "maxItems": 10,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact manufacturer; repeat for any-of.",
+              "title": "Make"
+            }
+          },
+          {
+            "description": "Electrical phase type.",
+            "in": "query",
+            "name": "phase",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PhaseType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Electrical phase type.",
+              "title": "Phase"
+            }
+          },
+          {
+            "description": "Installation type.",
+            "in": "query",
+            "name": "install_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InstallType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Installation type.",
+              "title": "Install Type"
+            }
+          },
+          {
+            "description": "Distribution transformer code, e.g. DT-007.",
+            "in": "query",
+            "name": "dt",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^DT-\\d{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Distribution transformer code, e.g. DT-007.",
+              "title": "Dt"
+            }
+          },
+          {
+            "description": "Feeder code, e.g. F-001. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "feeder",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^F-\\d{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Feeder code, e.g. F-001. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Feeder"
+            }
+          },
+          {
+            "description": "Substation code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "substation",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Substation code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Substation"
+            }
+          },
+          {
+            "description": "Subdivision code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "subdivision",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Subdivision code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Subdivision"
+            }
+          },
+          {
+            "description": "Division code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "division",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Division code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Division"
+            }
+          },
+          {
+            "description": "Circle code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "circle",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Circle code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Circle"
+            }
+          },
+          {
+            "description": "Zone code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "zone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Zone code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Zone"
+            }
+          },
+          {
+            "description": "True: only meters with a position; false: only without.",
+            "in": "query",
+            "name": "has_geo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True: only meters with a position; false: only without.",
+              "title": "Has Geo"
+            }
+          },
+          {
+            "description": "Sort order; ties are broken by meter id. `status` sorts alphabetically on the stored value (decommissioned, faulty, installed, unknown), not by severity.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/MeterSort",
+              "default": "meter_id",
+              "description": "Sort order; ties are broken by meter id. `status` sorts alphabetically on the stored value (decommissioned, faulty, installed, unknown), not by severity."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BBoxResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          }
+        },
+        "summary": "Find meters in a bounding box",
+        "tags": [
+          "geo"
+        ]
+      }
+    },
+    "/api/v1/geo/near": {
+      "get": {
+        "description": "Meters with a position within the radius, nearest first. Needs the local index.",
+        "operationId": "findMetersNear",
+        "parameters": [
+          {
+            "description": "Centre latitude in degrees.",
+            "in": "query",
+            "name": "lat",
+            "required": true,
+            "schema": {
+              "description": "Centre latitude in degrees.",
+              "maximum": 90,
+              "minimum": -90,
+              "title": "Lat",
+              "type": "number"
+            }
+          },
+          {
+            "description": "Centre longitude in degrees.",
+            "in": "query",
+            "name": "lng",
+            "required": true,
+            "schema": {
+              "description": "Centre longitude in degrees.",
+              "maximum": 180,
+              "minimum": -180,
+              "title": "Lng",
+              "type": "number"
+            }
+          },
+          {
+            "description": "Search radius in kilometres (up to 50).",
+            "in": "query",
+            "name": "radius_km",
+            "required": false,
+            "schema": {
+              "default": 1.0,
+              "description": "Search radius in kilometres (up to 50).",
+              "exclusiveMinimum": 0,
+              "maximum": 50,
+              "title": "Radius Km",
+              "type": "number"
+            }
+          },
+          {
+            "description": "Maximum meters returned.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Maximum meters returned.",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Case-insensitive text found in the meter id or serial.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive text found in the meter id or serial.",
+              "title": "Q"
+            }
+          },
+          {
+            "description": "Installation status; repeat for any-of.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/InstallStatus"
+                  },
+                  "maxItems": 10,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Installation status; repeat for any-of.",
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Exact manufacturer; repeat for any-of.",
+            "in": "query",
+            "name": "make",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "maxLength": 32,
+                    "type": "string"
+                  },
+                  "maxItems": 10,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact manufacturer; repeat for any-of.",
+              "title": "Make"
+            }
+          },
+          {
+            "description": "Electrical phase type.",
+            "in": "query",
+            "name": "phase",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PhaseType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Electrical phase type.",
+              "title": "Phase"
+            }
+          },
+          {
+            "description": "Installation type.",
+            "in": "query",
+            "name": "install_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InstallType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Installation type.",
+              "title": "Install Type"
+            }
+          },
+          {
+            "description": "Distribution transformer code, e.g. DT-007.",
+            "in": "query",
+            "name": "dt",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^DT-\\d{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Distribution transformer code, e.g. DT-007.",
+              "title": "Dt"
+            }
+          },
+          {
+            "description": "Feeder code, e.g. F-001. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "feeder",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^F-\\d{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Feeder code, e.g. F-001. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Feeder"
+            }
+          },
+          {
+            "description": "Substation code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "substation",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Substation code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Substation"
+            }
+          },
+          {
+            "description": "Subdivision code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "subdivision",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Subdivision code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Subdivision"
+            }
+          },
+          {
+            "description": "Division code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "division",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Division code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Division"
+            }
+          },
+          {
+            "description": "Circle code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "circle",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Circle code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Circle"
+            }
+          },
+          {
+            "description": "Zone code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "zone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Zone code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Zone"
+            }
+          },
+          {
+            "description": "True: only meters with a position; false: only without.",
+            "in": "query",
+            "name": "has_geo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True: only meters with a position; false: only without.",
+              "title": "Has Geo"
+            }
+          },
+          {
+            "description": "Sort order; ties are broken by meter id. `status` sorts alphabetically on the stored value (decommissioned, faulty, installed, unknown), not by severity.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/MeterSort",
+              "default": "meter_id",
+              "description": "Sort order; ties are broken by meter id. `status` sorts alphabetically on the stored value (decommissioned, faulty, installed, unknown), not by severity."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NearResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          }
+        },
+        "summary": "Find meters near a point",
+        "tags": [
+          "geo"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "getHealth",
@@ -1285,28 +2222,9 @@
     },
     "/api/v1/meters": {
       "get": {
-        "description": "Paginated meter list, optionally narrowed by a search text on id or serial.",
+        "description": "Paginated meter list. Filters combine (all must match). While the local index is empty only `q` and the default sort are served, from the live portal; other filters then answer 409.",
         "operationId": "listMeters",
         "parameters": [
-          {
-            "description": "Search text matched against meter id and serial.",
-            "in": "query",
-            "name": "q",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "maxLength": 64,
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Search text matched against meter id and serial.",
-              "title": "Q"
-            }
-          },
           {
             "description": "Page number, starting at 1.",
             "in": "query",
@@ -1333,6 +2251,268 @@
               "title": "Page Size",
               "type": "integer"
             }
+          },
+          {
+            "description": "Case-insensitive text found in the meter id or serial.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive text found in the meter id or serial.",
+              "title": "Q"
+            }
+          },
+          {
+            "description": "Installation status; repeat for any-of.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/InstallStatus"
+                  },
+                  "maxItems": 10,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Installation status; repeat for any-of.",
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Exact manufacturer; repeat for any-of.",
+            "in": "query",
+            "name": "make",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "maxLength": 32,
+                    "type": "string"
+                  },
+                  "maxItems": 10,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact manufacturer; repeat for any-of.",
+              "title": "Make"
+            }
+          },
+          {
+            "description": "Electrical phase type.",
+            "in": "query",
+            "name": "phase",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PhaseType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Electrical phase type.",
+              "title": "Phase"
+            }
+          },
+          {
+            "description": "Installation type.",
+            "in": "query",
+            "name": "install_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InstallType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Installation type.",
+              "title": "Install Type"
+            }
+          },
+          {
+            "description": "Distribution transformer code, e.g. DT-007.",
+            "in": "query",
+            "name": "dt",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^DT-\\d{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Distribution transformer code, e.g. DT-007.",
+              "title": "Dt"
+            }
+          },
+          {
+            "description": "Feeder code, e.g. F-001. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "feeder",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^F-\\d{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Feeder code, e.g. F-001. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Feeder"
+            }
+          },
+          {
+            "description": "Substation code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "substation",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Substation code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Substation"
+            }
+          },
+          {
+            "description": "Subdivision code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "subdivision",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Subdivision code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Subdivision"
+            }
+          },
+          {
+            "description": "Division code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "division",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Division code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Division"
+            }
+          },
+          {
+            "description": "Circle code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "circle",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Circle code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Circle"
+            }
+          },
+          {
+            "description": "Zone code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "zone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Zone code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Zone"
+            }
+          },
+          {
+            "description": "True: only meters with a position; false: only without.",
+            "in": "query",
+            "name": "has_geo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True: only meters with a position; false: only without.",
+              "title": "Has Geo"
+            }
+          },
+          {
+            "description": "Sort order; ties are broken by meter id. `status` sorts alphabetically on the stored value (decommissioned, faulty, installed, unknown), not by severity.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/MeterSort",
+              "default": "meter_id",
+              "description": "Sort order; ties are broken by meter id. `status` sorts alphabetically on the stored value (decommissioned, faulty, installed, unknown), not by severity."
+            }
           }
         ],
         "responses": {
@@ -1345,6 +2525,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
           },
           "422": {
             "content": {
@@ -1386,6 +2576,334 @@
           }
         },
         "summary": "List meters",
+        "tags": [
+          "meters"
+        ]
+      }
+    },
+    "/api/v1/meters/facets": {
+      "get": {
+        "description": "Counts for filter chips. Each field's counts apply every filter except that field's own, so the alternatives stay visible. Meters lacking a value (no install type or DT) are not counted, so a field's counts may not sum to the total. Needs the local index.",
+        "operationId": "getMeterFacets",
+        "parameters": [
+          {
+            "description": "Field to count; repeat for several. Default: all five.",
+            "in": "query",
+            "name": "field",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/FacetField"
+                  },
+                  "maxItems": 10,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Field to count; repeat for several. Default: all five.",
+              "title": "Field"
+            }
+          },
+          {
+            "description": "Case-insensitive text found in the meter id or serial.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive text found in the meter id or serial.",
+              "title": "Q"
+            }
+          },
+          {
+            "description": "Installation status; repeat for any-of.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/InstallStatus"
+                  },
+                  "maxItems": 10,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Installation status; repeat for any-of.",
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Exact manufacturer; repeat for any-of.",
+            "in": "query",
+            "name": "make",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "maxLength": 32,
+                    "type": "string"
+                  },
+                  "maxItems": 10,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact manufacturer; repeat for any-of.",
+              "title": "Make"
+            }
+          },
+          {
+            "description": "Electrical phase type.",
+            "in": "query",
+            "name": "phase",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PhaseType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Electrical phase type.",
+              "title": "Phase"
+            }
+          },
+          {
+            "description": "Installation type.",
+            "in": "query",
+            "name": "install_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InstallType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Installation type.",
+              "title": "Install Type"
+            }
+          },
+          {
+            "description": "Distribution transformer code, e.g. DT-007.",
+            "in": "query",
+            "name": "dt",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^DT-\\d{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Distribution transformer code, e.g. DT-007.",
+              "title": "Dt"
+            }
+          },
+          {
+            "description": "Feeder code, e.g. F-001. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "feeder",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^F-\\d{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Feeder code, e.g. F-001. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Feeder"
+            }
+          },
+          {
+            "description": "Substation code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "substation",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Substation code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Substation"
+            }
+          },
+          {
+            "description": "Subdivision code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "subdivision",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Subdivision code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Subdivision"
+            }
+          },
+          {
+            "description": "Division code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "division",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Division code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Division"
+            }
+          },
+          {
+            "description": "Circle code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "circle",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Circle code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Circle"
+            }
+          },
+          {
+            "description": "Zone code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+            "in": "query",
+            "name": "zone",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Zone code. Matches the code at that level wherever it occurs (e.g. division=D-01 matches every division coded D-01); path-exact filtering is not available yet.",
+              "title": "Zone"
+            }
+          },
+          {
+            "description": "True: only meters with a position; false: only without.",
+            "in": "query",
+            "name": "has_geo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True: only meters with a position; false: only without.",
+              "title": "Has Geo"
+            }
+          },
+          {
+            "description": "Sort order; ties are broken by meter id. `status` sorts alphabetically on the stored value (decommissioned, faulty, installed, unknown), not by severity.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/MeterSort",
+              "default": "meter_id",
+              "description": "Sort order; ties are broken by meter id. `status` sorts alphabetically on the stored value (decommissioned, faulty, installed, unknown), not by severity."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FacetsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          }
+        },
+        "summary": "Count meters per attribute value",
         "tags": [
           "meters"
         ]
@@ -1648,7 +3166,7 @@
                 }
               }
             },
-            "description": "A sync is already running"
+            "description": "A sync is already running, or the local index is not ready"
           },
           "422": {
             "content": {
@@ -1876,6 +3394,127 @@
           }
         },
         "summary": "Get a transformer",
+        "tags": [
+          "transformers"
+        ]
+      }
+    },
+    "/api/v1/transformers/{code}/meters": {
+      "get": {
+        "description": "Paginated meters installed on one transformer. Needs the local index.",
+        "operationId": "listTransformerMeters",
+        "parameters": [
+          {
+            "description": "Transformer code, e.g. DT-001.",
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "description": "Transformer code, e.g. DT-001.",
+              "pattern": "^DT-\\d{3}$",
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page number, starting at 1.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Page number, starting at 1.",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Items per page (1 to 200).",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Items per page (1 to 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_MeterSummary_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portal auth or protocol failure"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portal unavailable",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (present when the portal gave a hint).",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List a transformer's meters",
         "tags": [
           "transformers"
         ]

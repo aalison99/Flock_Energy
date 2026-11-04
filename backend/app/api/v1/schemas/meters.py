@@ -13,6 +13,7 @@ from app.domain.models import (
     Meter,
     PhaseType,
 )
+from app.services.interfaces import FacetField
 from app.services.results import MeterDetailResult
 
 
@@ -58,10 +59,15 @@ class GeoOut(BaseModel):
 class MetaOut(BaseModel):
     """Provenance and freshness of the answer."""
 
-    source: Literal["portal"] = Field(description="Where the data came from.")
-    fetched_at: datetime = Field(description="When the data was fetched from the portal (UTC).")
+    source: Literal["portal", "index"] = Field(
+        description="Where the data came from: the live portal or the local index."
+    )
+    fetched_at: datetime = Field(
+        description="When the data was fetched from the portal or last synced into the index (UTC)."
+    )
     stale: bool = Field(
-        description="True when the cached data is past its TTL and the portal could not refresh it."
+        description="True when the data is older than its freshness limit "
+        "(portal cache TTL, or the index's maximum age)."
     )
 
 
@@ -149,3 +155,27 @@ def to_meter_detail(result: MeterDetailResult) -> MeterDetail:
             stale=result.meta.stale,
         ),
     )
+
+
+class FacetsResponse(BaseModel):
+    """Meter counts per attribute value, for building filter chips."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "facets": {
+                    "status": {"installed": 238, "faulty": 90, "decommissioned": 75},
+                    "phase": {"single": 277, "three": 126},
+                }
+            }
+        }
+    )
+
+    facets: dict[str, dict[str, int]] = Field(
+        description="For each requested field, the count of matching meters per value. Each "
+        "field's counts apply every filter except that field's own; zero counts are omitted."
+    )
+
+
+def to_facets_response(facets: dict[FacetField, dict[str, int]]) -> FacetsResponse:
+    return FacetsResponse(facets={field.value: counts for field, counts in facets.items()})

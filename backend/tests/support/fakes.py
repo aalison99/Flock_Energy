@@ -1,9 +1,13 @@
 """Small fakes of the read-only portal views used by service and API tests."""
 
+from collections import Counter
 from datetime import datetime
 
+from app.domain.models import Meter, PageResult
 from app.portal.interfaces import BreakerState, Freshness
+from app.repositories.interfaces import MeterQuery
 from app.services.results import IndexInfo
+from tests.support import meter_oracle
 
 
 class FakeFreshness:
@@ -36,3 +40,52 @@ class FakeIndexReader:
 
     async def index_info(self) -> IndexInfo:
         return self.info
+
+
+class FakeMeterRepository:
+    """MeterRepository over a plain list, answering queries with the brute-force oracle."""
+
+    def __init__(self, meters: list[Meter] | None = None, synced_at: datetime | None = None):
+        self.meters = list(meters or [])
+        self.synced_at = synced_at
+        self.calls: list[tuple[str, tuple[object, ...]]] = []
+
+    async def count(self) -> int:
+        return len(self.meters)
+
+    async def get(self, meter_id: str) -> Meter | None:
+        return next((m for m in self.meters if m.meter_id == meter_id), None)
+
+    async def search(self, filters: MeterQuery, page: int, page_size: int) -> PageResult[Meter]:
+        self.calls.append(("search", (filters, page, page_size)))
+        found = meter_oracle.search(self.meters, filters)
+        start = (page - 1) * page_size
+        return PageResult(items=found[start : start + page_size], total=len(found))
+
+    async def facet_counts(self, filters: MeterQuery, field: str) -> dict[str, int]:
+        self.calls.append(("facet_counts", (filters, field)))
+        values = (
+            meter_oracle.FACET_VALUE[field](m) for m in meter_oracle.search(self.meters, filters)
+        )
+        return dict(Counter(v for v in values if v is not None))
+
+    async def get_synced_at(self, meter_id: str) -> datetime | None:
+        return self.synced_at if await self.get(meter_id) else None
+
+    async def within_box(
+        self,
+        min_lat: float,
+        min_lng: float,
+        max_lat: float,
+        max_lng: float,
+        filters: MeterQuery,
+        limit: int,
+    ) -> list[Meter]:
+        self.calls.append(("within_box", (min_lat, min_lng, max_lat, max_lng, filters, limit)))
+        return [
+            m
+            for m in meter_oracle.search(self.meters, filters)
+            if m.geo is not None
+            and min_lat <= m.geo.lat <= max_lat
+            and min_lng <= m.geo.lng <= max_lng
+        ][:limit]

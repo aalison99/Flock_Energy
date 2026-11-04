@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query
 
 from app.api.v1.schemas.common import error_responses
+from app.api.v1.schemas.meters import MeterSummary, to_meter_summary
 from app.api.v1.schemas.transformers import TransformerOut, to_transformer_out
 from app.core.deps import get_transformer_service
 from app.core.pagination import Page, PageParams, paginate
@@ -48,3 +49,21 @@ async def get_transformer(
     code: Annotated[str, Path(pattern=r"^DT-\d{3}$", description="Transformer code, e.g. DT-001.")],
 ) -> TransformerOut:
     return to_transformer_out(await service.get_transformer(code))
+
+
+@router.get(
+    "/transformers/{code}/meters",
+    operation_id="listTransformerMeters",
+    response_model=Page[MeterSummary],
+    summary="List a transformer's meters",
+    description="Paginated meters installed on one transformer. Needs the local index.",
+    responses=error_responses(404, 409, 422, 502, 503),
+)
+async def list_transformer_meters(
+    service: Annotated[TransformerService, Depends(get_transformer_service)],
+    params: Annotated[PageParams, Depends()],
+    code: Annotated[str, Path(pattern=r"^DT-\d{3}$", description="Transformer code, e.g. DT-001.")],
+) -> Page[MeterSummary]:
+    result = await service.list_meters(code, params.page, params.page_size)
+    summaries = PageResult(items=[to_meter_summary(m) for m in result.items], total=result.total)
+    return paginate(summaries, params.page, params.page_size)
