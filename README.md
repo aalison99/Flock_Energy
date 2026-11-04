@@ -35,9 +35,10 @@ The service logs in to the portal like a normal user, reads its data politely, a
 - [uv](https://docs.astral.sh/uv/getting-started/installation/), which installs Python 3.13 itself.
 - Node.js 20 or newer, for the web client only.
 - `make`.
+- Internet access to `https://urja-ops.flockenergy.tech`.
 
 ```bash
-git clone <this repo> && cd <repo>
+git clone <this repository's URL> && cd <the cloned folder>
 cp .env.example .env          # then put the portal login from the assignment email into .env
 make install                  # backend dependencies (uv sync --locked)
 make run                      # API on http://localhost:8000  (Swagger UI at /docs)
@@ -49,19 +50,21 @@ URJA_PORTAL_URL=https://urja-ops.flockenergy.tech
 URJA_PORTAL_EMAIL=<from the assignment>
 URJA_PORTAL_PASSWORD=<from the assignment>
 ```
+If a value is missing or invalid, the API refuses to start and names the setting, e.g. `Invalid configuration: missing or invalid portal_password. See .env.example.` A wrong password is only detected at the first portal call, which fails with `502 upstream_auth_failed`. Auth failures also count towards the circuit breaker, so the portal isn't hammered with logins.
 
 **What happens on first start:**
 1. The SQLite index (`backend/urja.db`) is created and migrated.
 2. Because the index is empty, a **background sync** starts. The API still serves requests during it.
 3. The sync pulls all 403 meters in one signed bulk export, then the 40 transformers, then every meter's readings. It is deliberately paced at 1.5 requests/s to stay under the portal's rate limit, so it takes **about 5 minutes**.
 4. Until it finishes, meter search answers straight from the portal. Index-only features such as filters, facets, geo search and analytics answer `409 index_not_ready`.
-5. Follow progress with `curl localhost:8000/api/v1/sync/status`.
+5. Follow progress with `curl localhost:8000/api/v1/sync/status`. Its `counts` fill in as each phase finishes.
 
 **Web client** (in a second terminal):
 ```bash
 make web-install              # npm ci
 make web                      # http://localhost:5173 (proxies /api to :8000)
 ```
+`npm ci` reports audit warnings. They are all in dev tooling (build, test and lint). `npm --prefix frontend audit --omit=dev` reports **0** vulnerabilities in what ships to the browser.
 
 **Checks:**
 ```bash
@@ -283,7 +286,7 @@ API types are generated from `openapi.json`, so an API change breaks the fronten
 
 **Current counts:**
 - Backend: **1,285 tests, about 30 s**. No network and no real sleeps; the 16 live tests are opt-in.
-- Frontend: Vitest component tests for every screen.
+- Frontend: **108 Vitest tests** covering every screen.
 - Every module was reviewed with **mutation checks**: deliberately breaking the code and confirming a test fails.
 
 **Live checks run during development:** a full sync of all 403 meters with readings (0 failures, 409 requests, all 200), plus browser smoke tests of every screen against the real data.
