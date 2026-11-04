@@ -13,6 +13,7 @@ from app.services.readings.series import (
     interval_kind,
     missing_intervals,
     to_interval_points,
+    totals,
 )
 from app.services.results import Meta, ReadingSeriesResult, ReadingSummary
 
@@ -24,9 +25,10 @@ def _summarise(points: list[IntervalPoint], interval_minutes: int | None) -> Rea
         for p in points
         if p.start is not None
     )
+    total_kwh, total_kvah = totals(points)
     return ReadingSummary(
-        total_kwh=round(sum(p.kwh for p in points if p.kwh is not None), 3),
-        total_kvah=round(sum(p.kvah for p in points if p.kvah is not None), 3),
+        total_kwh=total_kwh,
+        total_kvah=total_kvah,
         avg_voltage=round(sum(volts) / len(volts), 1) if volts else None,
         readings=len(points),
         gaps=gaps,

@@ -1,9 +1,10 @@
 """Small fakes of the read-only portal views used by service and API tests."""
 
 from collections import Counter
-from datetime import datetime
+from collections.abc import Collection
+from datetime import date, datetime
 
-from app.domain.models import Meter, PageResult, Transformer
+from app.domain.models import Meter, PageResult, Reading, Transformer
 from app.portal.interfaces import BreakerState, Freshness
 from app.repositories.interfaces import MeterQuery
 from app.services.results import IndexInfo
@@ -108,3 +109,33 @@ class FakeTransformerRepository:
 
     async def count(self) -> int:
         return len(self.transformers)
+
+
+class FakeReadingRepository:
+    """ReadingRepository over a dict of readings per meter (only list_for_meters is used)."""
+
+    def __init__(self, by_meter: dict[str, list[Reading]] | None = None) -> None:
+        self.by_meter = dict(by_meter or {})
+        self.calls: list[Collection[str] | None] = []
+
+    async def list_for_meters(
+        self, meter_ids: Collection[str] | None, start: date | None, end: date | None
+    ) -> dict[str, list[Reading]]:
+        self.calls.append(None if meter_ids is None else set(meter_ids))
+        keep = (
+            self.by_meter
+            if meter_ids is None
+            else {k: v for k, v in self.by_meter.items() if k in set(meter_ids)}
+        )
+        return {
+            k: sorted(
+                (
+                    r
+                    for r in v
+                    if (start is None or r.at.date() >= start)
+                    and (end is None or r.at.date() <= end)
+                ),
+                key=lambda r: r.at,
+            )
+            for k, v in sorted(keep.items())
+        }

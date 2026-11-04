@@ -70,6 +70,13 @@ def missing_intervals(span_minutes: float, interval_minutes: int | None) -> int:
     return ceil(span_minutes / interval_minutes) - 1
 
 
+def totals(points: Sequence[IntervalPoint]) -> tuple[float, float]:
+    """(kWh, kVAh) consumed over the points, 3 dp; reset intervals (null deltas) add nothing."""
+    kwh = sum(p.kwh for p in points if p.kwh is not None)
+    kvah = sum(p.kvah for p in points if p.kvah is not None)
+    return round(kwh, 3), round(kvah, 3)
+
+
 def _first(reading: Reading) -> IntervalPoint:
     return IntervalPoint(
         reading.at, None, reading.kwh_register, reading.kvah_register, reading.voltage_r,

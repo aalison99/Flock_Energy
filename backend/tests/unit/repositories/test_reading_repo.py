@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
@@ -144,3 +144,68 @@ async def test_large_batch(conn: AsyncConnection, seeded: SqliteReadingRepositor
     rs = [Reading(base + timedelta(minutes=30 * i), float(i), float(i), None) for i in range(1300)]
     assert await seeded.replace_for_meter(mid, rs) == 1300
     assert await seeded.list(mid, None, None) == rs
+
+
+# --- list_for_meters (M8) ----------------------------------------------------------------------
+
+
+async def test_list_for_meters_none_means_all_and_groups_ascending(
+    conn: AsyncConnection, seeded: SqliteReadingRepository
+) -> None:
+    a, b = (await _ids(conn))[:2]
+    await seeded.replace_for_meter(a, [_r(25, 0), _r(24, 0)])
+    await seeded.replace_for_meter(b, [_r(24, 1)])
+    got = await seeded.list_for_meters(None, None, None)
+    assert set(got) == {a, b}
+    assert [r.at.day for r in got[a]] == [24, 25]  # ascending
+    assert len(got[b]) == 1
+
+
+async def test_list_for_meters_subset_and_empty(
+    conn: AsyncConnection, seeded: SqliteReadingRepository
+) -> None:
+    a, b = (await _ids(conn))[:2]
+    await seeded.replace_for_meter(a, [_r(24, 0)])
+    await seeded.replace_for_meter(b, [_r(24, 1)])
+    assert set(await seeded.list_for_meters([b, "J999999"], None, None)) == {b}
+    assert await seeded.list_for_meters([], None, None) == {}
+
+
+async def test_list_for_meters_uses_ist_day_bounds(
+    conn: AsyncConnection, seeded: SqliteReadingRepository
+) -> None:
+    a = (await _ids(conn))[0]
+    rs = [
+        Reading(datetime(2026, 6, 23, 23, 59, tzinfo=IST), 1, 2, None),  # day before start
+        Reading(datetime(2026, 6, 24, 0, 0, tzinfo=IST), 2, 4, None),  # first instant of start
+        Reading(datetime(2026, 6, 24, 23, 59, tzinfo=IST), 3, 6, None),  # last minute of end
+        Reading(datetime(2026, 6, 25, 0, 0, tzinfo=IST), 4, 8, None),  # day after end
+    ]
+    await seeded.replace_for_meter(a, rs)
+    got = await seeded.list_for_meters([a], date(2026, 6, 24), date(2026, 6, 24))
+    assert [r.kwh_register for r in got[a]] == [2, 3]
+    only_start = await seeded.list_for_meters([a], date(2026, 6, 25), None)
+    assert [r.kwh_register for r in only_start[a]] == [4]
+
+
+async def test_list_for_meters_chunks_ids_in_batches_of_at_most_500(
+    conn: AsyncConnection, seeded: SqliteReadingRepository
+) -> None:
+    real = await _ids(conn)
+    assert len(real) >= 2
+    # 600 unknown ids between two real ones: they must land in different chunks.
+    ids = [real[0], *[f"J9{n:05d}" for n in range(600)], real[1]]
+    await seeded.replace_for_meter(real[0], [_r(24, 0)])
+    await seeded.replace_for_meter(real[1], [_r(24, 1)])
+    seen: list[int] = []
+
+    def count(_c: object, _cur: object, _stmt: str, params: object, *_a: object) -> None:
+        seen.append(len(params))  # type: ignore[arg-type]
+
+    event.listen(conn.sync_connection, "before_cursor_execute", count)
+    try:
+        got = await seeded.list_for_meters(ids, None, None)
+    finally:
+        event.remove(conn.sync_connection, "before_cursor_execute", count)
+    assert set(got) == {real[0], real[1]}
+    assert len(seen) == 2 and max(seen) <= 500

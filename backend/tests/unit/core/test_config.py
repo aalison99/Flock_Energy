@@ -184,3 +184,49 @@ def test_portal_max_rps_default_and_bounds() -> None:
     for bad in (0, -1, 20.5):
         with pytest.raises(ValidationError):
             _required(portal_max_rps=bad)
+
+
+def test_anomaly_threshold_defaults(clean_env: pytest.MonkeyPatch) -> None:
+    s = Settings(
+        portal_url="https://p.example.test",  # type: ignore[arg-type]
+        portal_email="a@b.test",
+        portal_password="pw",  # type: ignore[arg-type]
+        _env_file=None,
+    )
+    assert (s.anomaly_voltage_min_v, s.anomaly_voltage_max_v) == (207.0, 253.0)
+    assert s.anomaly_flatline_hours == 6.0
+    assert s.anomaly_spike_sigma == 4.0
+    assert s.anomaly_spike_min_points == 24
+    assert s.anomaly_inactive_min_kwh == 0.5
+
+
+def test_anomaly_voltage_min_must_be_below_max(clean_env: pytest.MonkeyPatch) -> None:
+    clean_env.setenv("URJA_PORTAL_URL", "https://p.example.test")
+    clean_env.setenv("URJA_PORTAL_EMAIL", "a@b.test")
+    clean_env.setenv("URJA_PORTAL_PASSWORD", "pw")
+    clean_env.setenv("URJA_ANOMALY_VOLTAGE_MIN_V", "250")
+    clean_env.setenv("URJA_ANOMALY_VOLTAGE_MAX_V", "250")
+    with pytest.raises(SystemExit) as exc:
+        load_settings()
+    assert "URJA_ANOMALY_VOLTAGE_MIN_V" in str(exc.value)
+    assert "URJA_ANOMALY_VOLTAGE_MAX_V" in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    ("name", "bad"),
+    [
+        ("anomaly_flatline_hours", 0),
+        ("anomaly_spike_sigma", 0),
+        ("anomaly_spike_min_points", 1),
+        ("anomaly_inactive_min_kwh", -1),
+    ],
+)
+def test_anomaly_thresholds_are_validated(name: str, bad: float) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            portal_url="https://p.example.test",  # type: ignore[arg-type]
+            portal_email="a@b.test",
+            portal_password="pw",  # type: ignore[arg-type]
+            _env_file=None,
+            **{name: bad},
+        )

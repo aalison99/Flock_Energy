@@ -112,6 +112,15 @@ class ReadingRepository(Protocol):
         """Atomically delete the meter's readings and insert these; returns rows inserted."""
         ...
 
+    async def list_for_meters(
+        self, meter_ids: Collection[str] | None, start: date | None, end: date | None
+    ) -> dict[str, list[Reading]]:
+        """Readings per meter (ascending), within the inclusive IST calendar days.
+
+        None means every meter; meters without readings in range are absent from the result.
+        """
+        ...
+
     async def list(self, meter_id: str, start: date | None, end: date | None) -> list[Reading]:
         """Readings ascending by time within the inclusive IST calendar days."""
         ...

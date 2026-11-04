@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     sync_on_startup: bool = True  # fill an empty index in the background at startup
     sync_readings_on_startup: bool = True
     sync_concurrency: int = Field(default=4, ge=1, le=4)  # per-meter portal calls in flight
+    anomaly_voltage_min_v: float = Field(default=207.0, gt=0)  # 230 V - 10%
+    anomaly_voltage_max_v: float = Field(default=253.0, gt=0)  # 230 V + 10%
+    anomaly_flatline_hours: float = Field(default=6.0, gt=0)  # zero-kWh span that is flagged
+    anomaly_spike_sigma: float = Field(default=4.0, gt=0)  # stdevs above the meter's mean
+    anomaly_spike_min_points: int = Field(default=24, ge=2)  # intervals needed to judge spikes
+    anomaly_inactive_min_kwh: float = Field(default=0.5, ge=0)  # faulty/decommissioned but above
 
     @field_validator("log_level", mode="before")
     @classmethod
@@ -51,6 +57,12 @@ class Settings(BaseSettings):
     def _max_delay_not_below_base(self) -> Self:
         if self.retry_max_delay_s < self.retry_base_delay_s:
             raise ValueError("retry_max_delay_s must be >= retry_base_delay_s")
+        return self
+
+    @model_validator(mode="after")
+    def _voltage_band_is_ordered(self) -> Self:
+        if self.anomaly_voltage_min_v >= self.anomaly_voltage_max_v:
+            raise ValueError("anomaly_voltage_min_v must be < anomaly_voltage_max_v")
         return self
 
 

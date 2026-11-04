@@ -25,6 +25,116 @@
         "title": "AltNameOut",
         "type": "object"
       },
+      "AnomalyListResponse": {
+        "description": "A page of anomalies plus the rule list.",
+        "properties": {
+          "has_next": {
+            "description": "Whether a later page exists.",
+            "title": "Has Next",
+            "type": "boolean"
+          },
+          "items": {
+            "description": "The items on this page.",
+            "items": {
+              "$ref": "#/components/schemas/AnomalyOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "description": "Current page number, starting at 1.",
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "description": "Maximum items per page.",
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "rules": {
+            "description": "Every registered rule, regardless of filters.",
+            "items": {
+              "$ref": "#/components/schemas/RuleOut"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "total": {
+            "description": "Total number of matching items.",
+            "title": "Total",
+            "type": "integer"
+          },
+          "total_pages": {
+            "description": "Total number of pages at this page size.",
+            "title": "Total Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total",
+          "total_pages",
+          "has_next",
+          "rules"
+        ],
+        "title": "AnomalyListResponse",
+        "type": "object"
+      },
+      "AnomalyOut": {
+        "description": "One rule finding for one meter.",
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Instant of the finding (IST); null when not dated.",
+            "title": "At"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "description": "Rule-specific facts behind the finding.",
+            "title": "Evidence",
+            "type": "object"
+          },
+          "message": {
+            "description": "Human-readable summary.",
+            "title": "Message",
+            "type": "string"
+          },
+          "meter_id": {
+            "description": "Meter the finding is about.",
+            "title": "Meter Id",
+            "type": "string"
+          },
+          "rule": {
+            "description": "Id of the rule that fired.",
+            "title": "Rule",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity",
+            "description": "Severity of the rule."
+          }
+        },
+        "required": [
+          "rule",
+          "severity",
+          "meter_id",
+          "message",
+          "at",
+          "evidence"
+        ],
+        "title": "AnomalyOut",
+        "type": "object"
+      },
       "BBoxMeter": {
         "description": "A meter inside a bounding box (the slim shape a map needs).",
         "properties": {
@@ -132,6 +242,114 @@
         "title": "CheckOut",
         "type": "object"
       },
+      "ConsumptionBucketOut": {
+        "description": "Energy summed over the contributing meters for one hour or day.",
+        "properties": {
+          "end": {
+            "description": "Bucket end, exclusive (IST).",
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "kvah": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Apparent energy in kVAh.",
+            "title": "Kvah"
+          },
+          "kwh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Active energy in kWh.",
+            "title": "Kwh"
+          },
+          "meters": {
+            "description": "Meters that contributed to this bucket.",
+            "title": "Meters",
+            "type": "integer"
+          },
+          "start": {
+            "description": "Bucket start (IST).",
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "kwh",
+          "kvah",
+          "meters"
+        ],
+        "title": "ConsumptionBucketOut",
+        "type": "object"
+      },
+      "ConsumptionResponse": {
+        "description": "Consumption per hour or day across a node's meters (or the whole fleet).",
+        "properties": {
+          "items": {
+            "description": "Buckets, ascending by start.",
+            "items": {
+              "$ref": "#/components/schemas/ConsumptionBucketOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "meters_excluded_coarser": {
+            "description": "Reporting meters left out because their interval is coarser than the bucket.",
+            "title": "Meters Excluded Coarser",
+            "type": "integer"
+          },
+          "meters_included": {
+            "description": "Meters whose cadence fits the resolution.",
+            "title": "Meters Included",
+            "type": "integer"
+          },
+          "node": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The node filter that was applied, if any.",
+            "title": "Node"
+          },
+          "resolution": {
+            "description": "Bucket width.",
+            "enum": [
+              "hourly",
+              "daily"
+            ],
+            "title": "Resolution",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node",
+          "resolution",
+          "meters_included",
+          "meters_excluded_coarser",
+          "items"
+        ],
+        "title": "ConsumptionResponse",
+        "type": "object"
+      },
       "DataQualityResponse": {
         "description": "A page of issues plus unfiltered counts per check.",
         "properties": {
@@ -196,6 +414,110 @@
           "checks"
         ],
         "title": "DataQualityResponse",
+        "type": "object"
+      },
+      "DtLoadOut": {
+        "description": "Estimated loading of one distribution transformer.",
+        "properties": {
+          "avg_kva_est": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Estimated average apparent power in kVA.",
+            "title": "Avg Kva Est"
+          },
+          "capacity_kva": {
+            "description": "Rated capacity in kVA.",
+            "title": "Capacity Kva",
+            "type": "integer"
+          },
+          "code": {
+            "description": "DT code.",
+            "title": "Code",
+            "type": "string"
+          },
+          "half_hourly_meters": {
+            "description": "Of those, meters reporting half-hourly.",
+            "title": "Half Hourly Meters",
+            "type": "integer"
+          },
+          "meter_count": {
+            "description": "Indexed meters on this DT.",
+            "title": "Meter Count",
+            "type": "integer"
+          },
+          "name": {
+            "description": "DT name.",
+            "title": "Name",
+            "type": "string"
+          },
+          "overloaded": {
+            "description": "True when utilisation_pct exceeds 100.",
+            "title": "Overloaded",
+            "type": "boolean"
+          },
+          "peak_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Start of the peak half hour (IST).",
+            "title": "Peak At"
+          },
+          "peak_kva_est": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Estimated peak apparent power in kVA; null without half-hourly data.",
+            "title": "Peak Kva Est"
+          },
+          "skipped_gap_intervals": {
+            "description": "Half-hourly intervals left out of the estimate because they span a data gap.",
+            "title": "Skipped Gap Intervals",
+            "type": "integer"
+          },
+          "utilisation_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Peak as a percentage of capacity.",
+            "title": "Utilisation Pct"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "capacity_kva",
+          "meter_count",
+          "half_hourly_meters",
+          "skipped_gap_intervals",
+          "peak_kva_est",
+          "avg_kva_est",
+          "peak_at",
+          "utilisation_pct",
+          "overloaded"
+        ],
+        "title": "DtLoadOut",
         "type": "object"
       },
       "ErrorBody": {
@@ -284,6 +606,90 @@
           "facets"
         ],
         "title": "FacetsResponse",
+        "type": "object"
+      },
+      "FleetSummaryOut": {
+        "description": "Fleet-wide figures computed from the indexed readings.",
+        "properties": {
+          "anomalies_by_rule": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Anomaly count per rule id, zero-filled for every registered rule.",
+            "title": "Anomalies By Rule",
+            "type": "object"
+          },
+          "first_reading_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Earliest reading instant (IST); null when no meter reports.",
+            "title": "First Reading At"
+          },
+          "interval_kinds": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Meters per reading cadence: half_hourly, daily or unknown (unknown includes silent meters).",
+            "title": "Interval Kinds",
+            "type": "object"
+          },
+          "last_reading_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Latest reading instant (IST); null when no meter reports.",
+            "title": "Last Reading At"
+          },
+          "meters_by_status": {
+            "$ref": "#/components/schemas/StatusBreakdown",
+            "description": "Fleet meters per installation status, every status listed."
+          },
+          "reporting_meters": {
+            "description": "Meters with at least two readings.",
+            "title": "Reporting Meters",
+            "type": "integer"
+          },
+          "silent_meters": {
+            "description": "Meters with fewer than two readings.",
+            "title": "Silent Meters",
+            "type": "integer"
+          },
+          "total_kwh": {
+            "description": "Energy consumed over the indexed window, in kWh.",
+            "title": "Total Kwh",
+            "type": "number"
+          },
+          "total_meters": {
+            "description": "Meters in the local index.",
+            "title": "Total Meters",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_meters",
+          "meters_by_status",
+          "reporting_meters",
+          "silent_meters",
+          "total_kwh",
+          "first_reading_at",
+          "last_reading_at",
+          "anomalies_by_rule",
+          "interval_kinds"
+        ],
+        "title": "FleetSummaryOut",
         "type": "object"
       },
       "GeoOut": {
@@ -511,6 +917,30 @@
           "stale"
         ],
         "title": "MetaOut",
+        "type": "object"
+      },
+      "MeterAnomaliesResponse": {
+        "description": "Every anomaly of one meter.",
+        "properties": {
+          "items": {
+            "description": "Findings, most severe first.",
+            "items": {
+              "$ref": "#/components/schemas/AnomalyOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "meter_id": {
+            "description": "The meter.",
+            "title": "Meter Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "meter_id",
+          "items"
+        ],
+        "title": "MeterAnomaliesResponse",
         "type": "object"
       },
       "MeterDetail": {
@@ -1490,6 +1920,32 @@
         "title": "Resolution",
         "type": "string"
       },
+      "RuleOut": {
+        "description": "One registered anomaly rule.",
+        "properties": {
+          "description": {
+            "description": "What the rule looks for.",
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "description": "Rule id, usable as the `rule` filter.",
+            "title": "Id",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity",
+            "description": "Severity of findings from this rule."
+          }
+        },
+        "required": [
+          "id",
+          "severity",
+          "description"
+        ],
+        "title": "RuleOut",
+        "type": "object"
+      },
       "Severity": {
         "enum": [
           "info",
@@ -1717,6 +2173,68 @@
         "title": "SyncStatusResponse",
         "type": "object"
       },
+      "TopConsumerOut": {
+        "description": "A meter and its total consumption.",
+        "properties": {
+          "meter": {
+            "$ref": "#/components/schemas/MeterSummary",
+            "description": "The meter."
+          },
+          "total_kwh": {
+            "description": "Energy consumed over the indexed window, in kWh.",
+            "title": "Total Kwh",
+            "type": "number"
+          }
+        },
+        "required": [
+          "meter",
+          "total_kwh"
+        ],
+        "title": "TopConsumerOut",
+        "type": "object"
+      },
+      "TopConsumersResponse": {
+        "description": "Meters ordered by consumption, highest first.",
+        "properties": {
+          "items": {
+            "description": "Top consumers.",
+            "items": {
+              "$ref": "#/components/schemas/TopConsumerOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "TopConsumersResponse",
+        "type": "object"
+      },
+      "TransformerLoadResponse": {
+        "description": "Estimated DT loading, with the formula behind it.",
+        "properties": {
+          "estimate_note": {
+            "description": "How the estimate is computed and what it ignores.",
+            "title": "Estimate Note",
+            "type": "string"
+          },
+          "items": {
+            "description": "Transformers in the requested order.",
+            "items": {
+              "$ref": "#/components/schemas/DtLoadOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "estimate_note",
+          "items"
+        ],
+        "title": "TransformerLoadResponse",
+        "type": "object"
+      },
       "TransformerOut": {
         "description": "A distribution transformer (DT).",
         "example": {
@@ -1861,6 +2379,425 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/analytics/anomalies": {
+      "get": {
+        "description": "Findings from every registered rule over the indexed readings, ordered by severity (error, warning, info), then meter id, then time. `rules` lists every rule. Needs the local index.",
+        "operationId": "listAnomalies",
+        "parameters": [
+          {
+            "description": "Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes. Default: the whole fleet.",
+            "in": "query",
+            "name": "node",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^Z-\\d{2}(/[A-Z]{1,2}-\\d{2,3}){0,6}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes. Default: the whole fleet.",
+              "title": "Node"
+            }
+          },
+          {
+            "description": "Only this rule id.",
+            "in": "query",
+            "name": "rule",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this rule id.",
+              "title": "Rule"
+            }
+          },
+          {
+            "description": "Only this severity.",
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Severity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this severity.",
+              "title": "Severity"
+            }
+          },
+          {
+            "description": "Page number, starting at 1.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Page number, starting at 1.",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Items per page (1 to 200).",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Items per page (1 to 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnomalyListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          }
+        },
+        "summary": "List meter anomalies",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/consumption": {
+      "get": {
+        "description": "Energy summed across the meters of a hierarchy node (default: the whole fleet). Meters reporting less often than the resolution are left out and counted in `meters_excluded_coarser`. Needs the local index.",
+        "operationId": "getConsumption",
+        "parameters": [
+          {
+            "description": "Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes. Default: the whole fleet.",
+            "in": "query",
+            "name": "node",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^Z-\\d{2}(/[A-Z]{1,2}-\\d{2,3}){0,6}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes. Default: the whole fleet.",
+              "title": "Node"
+            }
+          },
+          {
+            "description": "Bucket width.",
+            "in": "query",
+            "name": "resolution",
+            "required": false,
+            "schema": {
+              "default": "daily",
+              "description": "Bucket width.",
+              "enum": [
+                "hourly",
+                "daily"
+              ],
+              "title": "Resolution",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsumptionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          }
+        },
+        "summary": "Get consumption per hour or day",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/summary": {
+      "get": {
+        "description": "Meter counts by status, reporting versus silent meters, total consumption, the reading window and anomaly counts per rule, computed from the indexed readings. Needs the local index.",
+        "operationId": "getFleetSummary",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FleetSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
+          }
+        },
+        "summary": "Get the fleet summary",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/top-consumers": {
+      "get": {
+        "description": "Reporting meters by total kWh, highest first, ties by meter id. Needs the local index.",
+        "operationId": "getTopConsumers",
+        "parameters": [
+          {
+            "description": "Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes. Default: the whole fleet.",
+            "in": "query",
+            "name": "node",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^Z-\\d{2}(/[A-Z]{1,2}-\\d{2,3}){0,6}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes. Default: the whole fleet.",
+              "title": "Node"
+            }
+          },
+          {
+            "description": "Meters to return (1 to 100).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "description": "Meters to return (1 to 100).",
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopConsumersResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          }
+        },
+        "summary": "List the top consuming meters",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/transformers/load": {
+      "get": {
+        "description": "Estimated peak and average kVA per DT from its half-hourly meters, against rated capacity. An estimate: see `estimate_note`. Needs the local index.",
+        "operationId": "getTransformerLoad",
+        "parameters": [
+          {
+            "description": "utilisation: highest first, no data last; code: ascending.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "utilisation",
+              "description": "utilisation: highest first, no data last; code: ascending.",
+              "enum": [
+                "utilisation",
+                "code"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "description": "DTs to return (1 to 100).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 40,
+              "description": "DTs to return (1 to 100).",
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransformerLoadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          }
+        },
+        "summary": "Estimate distribution transformer loading",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
     "/api/v1/data-quality": {
       "get": {
         "description": "Findings from every registered check over the indexed data: name conflicts, repaired blanks, DT mismatches, missing or outlying positions. `summary` counts all issues per check regardless of filters. Needs the local index.",
@@ -3741,6 +4678,72 @@
         "summary": "Get a meter",
         "tags": [
           "meters"
+        ]
+      }
+    },
+    "/api/v1/meters/{meter_id}/anomalies": {
+      "get": {
+        "description": "Every rule finding for the meter, most severe first. Needs the local index.",
+        "operationId": "getMeterAnomalies",
+        "parameters": [
+          {
+            "description": "Meter id, J followed by six digits.",
+            "in": "path",
+            "name": "meter_id",
+            "required": true,
+            "schema": {
+              "description": "Meter id, J followed by six digits.",
+              "pattern": "^J\\d{6}$",
+              "title": "Meter Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeterAnomaliesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          }
+        },
+        "summary": "List one meter's anomalies",
+        "tags": [
+          "analytics"
         ]
       }
     },

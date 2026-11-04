@@ -13,6 +13,7 @@ from app.domain.models import (
     Transformer,
 )
 from app.portal.interfaces import BreakerState
+from app.services.analytics.anomalies.models import Anomaly
 from app.services.quality.models import Issue, Severity
 from app.services.readings.buckets import Bucket, Resolution
 from app.services.readings.series import IntervalKind, IntervalPoint
@@ -151,3 +152,71 @@ class QualityReport:
     summary: dict[str, int]
     checks: list[CheckInfo]
     items: PageResult[Issue]
+
+
+# --- analytics -------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class FleetSummary:
+    """Fleet-wide numbers from the indexed readings. Silent meters count as interval "unknown"."""
+
+    total_meters: int
+    meters_by_status: dict[str, int]
+    reporting_meters: int
+    silent_meters: int
+    total_kwh: float
+    first_reading_at: datetime | None
+    last_reading_at: datetime | None
+    anomalies_by_rule: dict[str, int]
+    interval_kinds: dict[str, int]
+
+
+@dataclass(frozen=True)
+class ConsumptionBucket:
+    start: datetime
+    end: datetime
+    kwh: float | None
+    kvah: float | None
+    meters: int
+
+
+@dataclass(frozen=True)
+class ConsumptionSeries:
+    node: str | None
+    resolution: Resolution
+    meters_included: int
+    meters_excluded_coarser: int
+    items: list[ConsumptionBucket]
+
+
+@dataclass(frozen=True)
+class RuleInfo:
+    id: str
+    severity: Severity
+    description: str
+
+
+@dataclass(frozen=True)
+class AnomalyReport:
+    """One page of anomalies plus the rule list (unfiltered)."""
+
+    rules: list[RuleInfo]
+    items: PageResult[Anomaly]
+
+
+@dataclass(frozen=True)
+class DtLoad:
+    """Estimated transformer loading from half-hourly kVAh (an estimate, see AnalyticsService)."""
+
+    code: str
+    name: str
+    capacity_kva: int
+    meter_count: int
+    half_hourly_meters: int
+    skipped_gap_intervals: int
+    peak_kva_est: float | None
+    avg_kva_est: float | None
+    peak_at: datetime | None
+    utilisation_pct: float | None
+    overloaded: bool

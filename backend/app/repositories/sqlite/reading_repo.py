@@ -1,6 +1,6 @@
 """SQLite implementation of ReadingRepository."""
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import date
 from typing import Any
 
@@ -13,6 +13,8 @@ from app.domain.exceptions import NotFoundError
 from app.domain.models import Reading
 from app.repositories.sqlite import mapping
 from app.repositories.sqlite._bulk import insert_rows
+
+_CHUNK = 500  # bind parameters per IN (...) statement
 
 
 class SqliteReadingRepository:
@@ -34,6 +36,26 @@ class SqliteReadingRepository:
             if "FOREIGN KEY" in str(exc.orig):
                 raise NotFoundError(f"meter {meter_id} not in index") from exc
             raise
+
+    async def list_for_meters(
+        self, meter_ids: Collection[str] | None, start: date | None, end: date | None
+    ) -> dict[str, list[Reading]]:
+        lo, hi = mapping.ist_day_bounds(start, end)
+        base = select(readings).order_by(readings.c.meter_id, readings.c.at)
+        if lo is not None:
+            base = base.where(readings.c.at >= lo)
+        if hi is not None:
+            base = base.where(readings.c.at < hi)
+        ids = None if meter_ids is None else sorted(set(meter_ids))
+        batches = (
+            [None] if ids is None else [ids[i : i + _CHUNK] for i in range(0, len(ids), _CHUNK)]
+        )
+        grouped: dict[str, list[Reading]] = {}
+        for batch in batches:
+            stmt = base if batch is None else base.where(readings.c.meter_id.in_(batch))
+            for row in (await self._conn.execute(stmt)).mappings():
+                grouped.setdefault(row["meter_id"], []).append(mapping.row_to_reading(row))
+        return dict(sorted(grouped.items()))
 
     async def list(self, meter_id: str, start: date | None, end: date | None) -> list[Reading]:
         lo, hi = mapping.ist_day_bounds(start, end)

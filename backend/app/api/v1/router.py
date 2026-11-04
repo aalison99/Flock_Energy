@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.routers import (
+    analytics,
     data_quality,
     geo,
     health,
@@ -14,6 +15,7 @@ from app.api.v1.routers import (
 )
 
 api_router = APIRouter(prefix="/api/v1")
+api_router.include_router(analytics.router)
 api_router.include_router(data_quality.router)
 api_router.include_router(geo.router)
 api_router.include_router(health.router)

@@ -35,6 +35,9 @@ from app.repositories.sqlite.reading_repo import SqliteReadingRepository
 from app.repositories.sqlite.store import SqliteIndexStore
 from app.repositories.sqlite.sync_repo import SqliteSyncRepository
 from app.repositories.sqlite.transformer_repo import SqliteTransformerRepository
+from app.services.analytics.anomalies.models import AnomalyThresholds
+from app.services.analytics.anomalies.registry import build_rules
+from app.services.analytics_service import AnalyticsService
 from app.services.catalogs.indexed_catalog import IndexedMeterCatalog
 from app.services.catalogs.live_catalog import LiveMeterCatalog
 from app.services.catalogs.prefer_index import PreferIndexCatalog
@@ -273,3 +276,23 @@ def get_data_quality_service(
 ) -> DataQualityService:
     # The one line that picks the checks: everything in the registry.
     return DataQualityService(CHECKS, meters, transformers)
+
+
+def get_analytics_service(
+    meters: Annotated[MeterRepository, Depends(get_meter_repository)],
+    transformers: Annotated[TransformerRepository, Depends(get_transformer_repository)],
+    readings: Annotated[ReadingRepository, Depends(get_reading_repository)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> AnalyticsService:
+    # The one line that picks the rules: everything in the registry, with the configured limits.
+    rules = build_rules(
+        AnomalyThresholds(
+            voltage_min_v=settings.anomaly_voltage_min_v,
+            voltage_max_v=settings.anomaly_voltage_max_v,
+            flatline_hours=settings.anomaly_flatline_hours,
+            spike_sigma=settings.anomaly_spike_sigma,
+            spike_min_points=settings.anomaly_spike_min_points,
+            inactive_min_kwh=settings.anomaly_inactive_min_kwh,
+        )
+    )
+    return AnalyticsService(meters, transformers, readings, rules)

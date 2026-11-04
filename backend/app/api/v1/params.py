@@ -88,3 +88,19 @@ def meter_filter_params(
         has_geo=has_geo,
         sort=sort,
     )
+
+
+NODE_ID_PATTERN = r"^Z-\d{2}(/[A-Z]{1,2}-\d{2,3}){0,6}$"
+NODE_ID_DESCRIPTION = (
+    "Node id: the codes from the zone down to the node joined by '/', "
+    "e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter "
+    "because it contains slashes."
+)
+NodeId = Annotated[str, Query(pattern=NODE_ID_PATTERN, description=NODE_ID_DESCRIPTION)]
+OptionalNodeId = Annotated[
+    str | None,
+    Query(
+        pattern=NODE_ID_PATTERN,
+        description=NODE_ID_DESCRIPTION + " Default: the whole fleet.",
+    ),
+]

@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
+from app.api.v1.params import NodeId
 from app.api.v1.schemas.common import error_responses
 from app.api.v1.schemas.hierarchy import (
     NodeDetailOut,
@@ -18,18 +19,6 @@ from app.domain.models import PageResult
 from app.services.hierarchy_service import HierarchyService
 
 router = APIRouter(tags=["hierarchy"])
-
-NodeId = Annotated[
-    str,
-    Query(
-        pattern=r"^Z-\d{2}(/[A-Z]{1,2}-\d{2,3}){0,6}$",
-        description=(
-            "Node id: the codes from the zone down to the node joined by '/', "
-            "e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter "
-            "because it contains slashes."
-        ),
-    ),
-]
 
 
 @router.get(

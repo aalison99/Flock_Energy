@@ -7,6 +7,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 ROUTES: dict[tuple[str, str], set[str]] = {
+    ("get", "/api/v1/analytics/anomalies"): {"200", "404", "409", "422"},
+    ("get", "/api/v1/analytics/consumption"): {"200", "404", "409", "422"},
+    ("get", "/api/v1/analytics/summary"): {"200", "409"},
+    ("get", "/api/v1/analytics/top-consumers"): {"200", "404", "409", "422"},
+    ("get", "/api/v1/analytics/transformers/load"): {"200", "409", "422"},
     ("get", "/api/v1/data-quality"): {"200", "409", "422"},
     ("get", "/api/v1/health"): {"200"},
     ("get", "/api/v1/health/ready"): {"200", "503"},
@@ -18,6 +23,7 @@ ROUTES: dict[tuple[str, str], set[str]] = {
     ("get", "/api/v1/meters"): {"200", "409", "422", "502", "503"},
     ("get", "/api/v1/meters/facets"): {"200", "409", "422"},
     ("get", "/api/v1/meters/{meter_id}"): {"200", "404", "422", "502", "503"},
+    ("get", "/api/v1/meters/{meter_id}/anomalies"): {"200", "404", "409", "422"},
     ("get", "/api/v1/meters/{meter_id}/readings"): {"200", "404", "422", "502", "503"},
     ("post", "/api/v1/sync"): {"202", "409", "422"},
     ("get", "/api/v1/sync/status"): {"200"},
@@ -90,12 +96,20 @@ def test_enum_values_are_in_the_spec(spec: Any) -> None:
         "unknown",
     ]
     assert _enum_of(spec, "HierarchyNodeOut", "level") == levels
+    assert _enum_of(spec, "AnomalyOut", "severity") == ["info", "warning", "error"]
+    assert _enum_of(spec, "ConsumptionResponse", "resolution") == ["hourly", "daily"]
     assert _enum_of(spec, "PortalReadiness", "breaker") == ["closed", "open", "half_open"]
 
 
 def test_operation_ids(spec: Any) -> None:
     ids = {(m, p): op["operationId"] for p, ops in spec["paths"].items() for m, op in ops.items()}
     assert ids == {
+        ("get", "/api/v1/analytics/anomalies"): "listAnomalies",
+        ("get", "/api/v1/analytics/consumption"): "getConsumption",
+        ("get", "/api/v1/analytics/summary"): "getFleetSummary",
+        ("get", "/api/v1/analytics/top-consumers"): "getTopConsumers",
+        ("get", "/api/v1/analytics/transformers/load"): "getTransformerLoad",
+        ("get", "/api/v1/meters/{meter_id}/anomalies"): "getMeterAnomalies",
         ("get", "/api/v1/data-quality"): "getDataQualityReport",
         ("get", "/api/v1/hierarchy"): "getHierarchyTree",
         ("get", "/api/v1/hierarchy/node"): "getHierarchyNode",
