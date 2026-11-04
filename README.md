@@ -38,7 +38,7 @@ The service logs in to the portal like a normal user, reads its data politely, a
 - Internet access to `https://urja-ops.flockenergy.tech`.
 
 ```bash
-git clone <this repository's URL> && cd <the cloned folder>
+git clone https://github.com/aalison99/Flock_Energy.git && cd Flock_Energy
 cp .env.example .env          # then put the portal login from the assignment email into .env
 make install                  # backend dependencies (uv sync --locked)
 make run                      # API on http://localhost:8000  (Swagger UI at /docs)
