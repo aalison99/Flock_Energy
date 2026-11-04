@@ -1,6 +1,30 @@
 {
   "components": {
     "schemas": {
+      "AltNameOut": {
+        "description": "A non-canonical name seen for the node.",
+        "properties": {
+          "meter_ids": {
+            "description": "Meters that used this name.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Meter Ids",
+            "type": "array"
+          },
+          "name": {
+            "description": "The alternative name.",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "meter_ids"
+        ],
+        "title": "AltNameOut",
+        "type": "object"
+      },
       "BBoxMeter": {
         "description": "A meter inside a bounding box (the slim shape a map needs).",
         "properties": {
@@ -80,6 +104,98 @@
           "truncated"
         ],
         "title": "BBoxResponse",
+        "type": "object"
+      },
+      "CheckOut": {
+        "description": "One registered check.",
+        "properties": {
+          "description": {
+            "description": "What the check looks for.",
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "description": "Check id, usable as the `check` filter.",
+            "title": "Id",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity",
+            "description": "How serious an issue from this check is."
+          }
+        },
+        "required": [
+          "id",
+          "severity",
+          "description"
+        ],
+        "title": "CheckOut",
+        "type": "object"
+      },
+      "DataQualityResponse": {
+        "description": "A page of issues plus unfiltered counts per check.",
+        "properties": {
+          "checks": {
+            "description": "Every registered check.",
+            "items": {
+              "$ref": "#/components/schemas/CheckOut"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "has_next": {
+            "description": "Whether a later page exists.",
+            "title": "Has Next",
+            "type": "boolean"
+          },
+          "items": {
+            "description": "The items on this page.",
+            "items": {
+              "$ref": "#/components/schemas/IssueOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "description": "Current page number, starting at 1.",
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "description": "Maximum items per page.",
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "summary": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Issue count per check id over all data, ignoring the filters.",
+            "title": "Summary",
+            "type": "object"
+          },
+          "total": {
+            "description": "Total number of matching items.",
+            "title": "Total",
+            "type": "integer"
+          },
+          "total_pages": {
+            "description": "Total number of pages at this page size.",
+            "title": "Total Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total",
+          "total_pages",
+          "has_next",
+          "summary",
+          "checks"
+        ],
+        "title": "DataQualityResponse",
         "type": "object"
       },
       "ErrorBody": {
@@ -319,6 +435,51 @@
         ],
         "title": "InstallType",
         "type": "string"
+      },
+      "IssueOut": {
+        "description": "One finding.",
+        "properties": {
+          "check": {
+            "description": "Id of the check that found it.",
+            "title": "Check",
+            "type": "string"
+          },
+          "entity": {
+            "description": "Kind of entity concerned: meter, transformer or node.",
+            "title": "Entity",
+            "type": "string"
+          },
+          "entity_id": {
+            "description": "Meter id, DT code or hierarchy node id.",
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "description": "Check-specific facts behind the finding.",
+            "title": "Evidence",
+            "type": "object"
+          },
+          "message": {
+            "description": "Human-readable summary.",
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity",
+            "description": "Severity of the check."
+          }
+        },
+        "required": [
+          "check",
+          "severity",
+          "entity",
+          "entity_id",
+          "message",
+          "evidence"
+        ],
+        "title": "IssueOut",
+        "type": "object"
       },
       "MetaOut": {
         "description": "Provenance and freshness of the answer.",
@@ -626,6 +787,153 @@
           "items"
         ],
         "title": "NearResponse",
+        "type": "object"
+      },
+      "NodeDetailOut": {
+        "description": "One node with its path from the zone, children, counts and alias names.",
+        "example": {
+          "alt_names": [
+            {
+              "meter_ids": [
+                "J100400",
+                "J100401"
+              ],
+              "name": "Old Malviya Nagar Xfmr"
+            }
+          ],
+          "children": [],
+          "code": "DT-007",
+          "id": "Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007",
+          "level": "dt",
+          "meter_count": 13,
+          "name": "Sanganer DT 7",
+          "path": [
+            {
+              "code": "Z-01",
+              "id": "Z-01",
+              "level": "zone",
+              "meter_count": 120,
+              "name": "Jaipur Zone 1"
+            }
+          ],
+          "status_breakdown": {
+            "decommissioned": 2,
+            "faulty": 4,
+            "installed": 7,
+            "unknown": 0
+          },
+          "unplaced_count": 0
+        },
+        "properties": {
+          "alt_names": {
+            "description": "Other names used for this node.",
+            "items": {
+              "$ref": "#/components/schemas/AltNameOut"
+            },
+            "title": "Alt Names",
+            "type": "array"
+          },
+          "children": {
+            "description": "Child nodes sorted by code.",
+            "items": {
+              "$ref": "#/components/schemas/NodeSummaryOut"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "code": {
+            "description": "Node code.",
+            "title": "Code",
+            "type": "string"
+          },
+          "id": {
+            "description": "Node id: the codes from zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007.",
+            "title": "Id",
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/HierarchyLevel",
+            "description": "Hierarchy level."
+          },
+          "meter_count": {
+            "description": "Meters in this node's whole subtree.",
+            "title": "Meter Count",
+            "type": "integer"
+          },
+          "name": {
+            "description": "Canonical node name.",
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "description": "Zone down to this node, inclusive.",
+            "items": {
+              "$ref": "#/components/schemas/NodeSummaryOut"
+            },
+            "title": "Path",
+            "type": "array"
+          },
+          "status_breakdown": {
+            "$ref": "#/components/schemas/StatusBreakdown",
+            "description": "Subtree meters per status."
+          },
+          "unplaced_count": {
+            "description": "Meters attached here because a lower level was unfixable.",
+            "title": "Unplaced Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "level",
+          "code",
+          "name",
+          "path",
+          "children",
+          "meter_count",
+          "status_breakdown",
+          "unplaced_count",
+          "alt_names"
+        ],
+        "title": "NodeDetailOut",
+        "type": "object"
+      },
+      "NodeSummaryOut": {
+        "description": "A node without children: a step on the path or a child in a listing.",
+        "properties": {
+          "code": {
+            "description": "Node code.",
+            "title": "Code",
+            "type": "string"
+          },
+          "id": {
+            "description": "Node id: the codes from zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007.",
+            "title": "Id",
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/HierarchyLevel",
+            "description": "Hierarchy level."
+          },
+          "meter_count": {
+            "description": "Meters in the node's whole subtree.",
+            "title": "Meter Count",
+            "type": "integer"
+          },
+          "name": {
+            "description": "Canonical node name.",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "level",
+          "code",
+          "name",
+          "meter_count"
+        ],
+        "title": "NodeSummaryOut",
         "type": "object"
       },
       "Page_MeterSummary_": {
@@ -1182,6 +1490,48 @@
         "title": "Resolution",
         "type": "string"
       },
+      "Severity": {
+        "enum": [
+          "info",
+          "warning",
+          "error"
+        ],
+        "title": "Severity",
+        "type": "string"
+      },
+      "StatusBreakdown": {
+        "description": "Meters per installation status.",
+        "properties": {
+          "decommissioned": {
+            "description": "Meters with status decommissioned.",
+            "title": "Decommissioned",
+            "type": "integer"
+          },
+          "faulty": {
+            "description": "Meters with status faulty.",
+            "title": "Faulty",
+            "type": "integer"
+          },
+          "installed": {
+            "description": "Meters with status installed.",
+            "title": "Installed",
+            "type": "integer"
+          },
+          "unknown": {
+            "description": "Meters whose status is unknown.",
+            "title": "Unknown",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "installed",
+          "faulty",
+          "decommissioned",
+          "unknown"
+        ],
+        "title": "StatusBreakdown",
+        "type": "object"
+      },
       "SyncRequest": {
         "description": "Options for a sync run.",
         "example": {
@@ -1426,6 +1776,82 @@
         ],
         "title": "TransformerOut",
         "type": "object"
+      },
+      "TreeNodeOut": {
+        "description": "A hierarchy node, its subtree totals and its children (down to the requested depth).",
+        "properties": {
+          "children": {
+            "description": "Child nodes sorted by code; empty at the depth limit and at DTs.",
+            "items": {
+              "$ref": "#/components/schemas/TreeNodeOut"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "code": {
+            "description": "Node code, e.g. D-07.",
+            "title": "Code",
+            "type": "string"
+          },
+          "id": {
+            "description": "Node id: the codes from zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007.",
+            "title": "Id",
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/HierarchyLevel",
+            "description": "Hierarchy level."
+          },
+          "meter_count": {
+            "description": "Meters in this node's whole subtree.",
+            "title": "Meter Count",
+            "type": "integer"
+          },
+          "name": {
+            "description": "Canonical node name.",
+            "title": "Name",
+            "type": "string"
+          },
+          "status_breakdown": {
+            "$ref": "#/components/schemas/StatusBreakdown",
+            "description": "Subtree meters per status."
+          },
+          "unplaced_count": {
+            "description": "Meters attached here because a lower level was unfixable.",
+            "title": "Unplaced Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "level",
+          "code",
+          "name",
+          "meter_count",
+          "status_breakdown",
+          "unplaced_count",
+          "children"
+        ],
+        "title": "TreeNodeOut",
+        "type": "object"
+      },
+      "TreeResponse": {
+        "description": "The hierarchy tree: one entry per zone.",
+        "properties": {
+          "items": {
+            "description": "Zones, sorted by code.",
+            "items": {
+              "$ref": "#/components/schemas/TreeNodeOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "TreeResponse",
+        "type": "object"
       }
     }
   },
@@ -1435,6 +1861,114 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/data-quality": {
+      "get": {
+        "description": "Findings from every registered check over the indexed data: name conflicts, repaired blanks, DT mismatches, missing or outlying positions. `summary` counts all issues per check regardless of filters. Needs the local index.",
+        "operationId": "getDataQualityReport",
+        "parameters": [
+          {
+            "description": "Only issues from this check id.",
+            "in": "query",
+            "name": "check",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only issues from this check id.",
+              "title": "Check"
+            }
+          },
+          {
+            "description": "Only issues of this severity.",
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Severity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only issues of this severity.",
+              "title": "Severity"
+            }
+          },
+          {
+            "description": "Page number, starting at 1.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Page number, starting at 1.",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Items per page (1 to 200).",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Items per page (1 to 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataQualityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          }
+        },
+        "summary": "Get the data-quality report",
+        "tags": [
+          "data-quality"
+        ]
+      }
+    },
     "/api/v1/geo/bbox": {
       "get": {
         "description": "Meters with a position inside the inclusive box, by meter id. Needs the local index. A box crossing the antimeridian is not supported.",
@@ -2217,6 +2751,223 @@
         "summary": "Readiness probe",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/hierarchy": {
+      "get": {
+        "description": "Zone, circle, division, subdivision, substation, feeder and DT, rebuilt from the indexed meters. Nodes are identified by their full code path. Needs the local index.",
+        "operationId": "getHierarchyTree",
+        "parameters": [
+          {
+            "description": "Levels to include: 1 = zones only, 7 = down to DTs.",
+            "in": "query",
+            "name": "depth",
+            "required": false,
+            "schema": {
+              "default": 2,
+              "description": "Levels to include: 1 = zones only, 7 = down to DTs.",
+              "maximum": 7,
+              "minimum": 1,
+              "title": "Depth",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TreeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          }
+        },
+        "summary": "Get the network hierarchy tree",
+        "tags": [
+          "hierarchy"
+        ]
+      }
+    },
+    "/api/v1/hierarchy/node": {
+      "get": {
+        "description": "A node with its path from the zone, children, meter counts and alias names.",
+        "operationId": "getHierarchyNode",
+        "parameters": [
+          {
+            "description": "Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes.",
+            "in": "query",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes.",
+              "pattern": "^Z-\\d{2}(/[A-Z]{1,2}-\\d{2,3}){0,6}$",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          }
+        },
+        "summary": "Get one hierarchy node",
+        "tags": [
+          "hierarchy"
+        ]
+      }
+    },
+    "/api/v1/hierarchy/node/meters": {
+      "get": {
+        "description": "Paginated meters in the node's whole subtree, ordered by meter id.",
+        "operationId": "listHierarchyNodeMeters",
+        "parameters": [
+          {
+            "description": "Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes.",
+            "in": "query",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes.",
+              "pattern": "^Z-\\d{2}(/[A-Z]{1,2}-\\d{2,3}){0,6}$",
+              "title": "Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page number, starting at 1.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Page number, starting at 1.",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Items per page (1 to 200).",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Items per page (1 to 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_MeterSummary_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running, or the local index is not ready"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          }
+        },
+        "summary": "List the meters under a hierarchy node",
+        "tags": [
+          "hierarchy"
         ]
       }
     },

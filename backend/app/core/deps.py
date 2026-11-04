@@ -38,10 +38,13 @@ from app.repositories.sqlite.transformer_repo import SqliteTransformerRepository
 from app.services.catalogs.indexed_catalog import IndexedMeterCatalog
 from app.services.catalogs.live_catalog import LiveMeterCatalog
 from app.services.catalogs.prefer_index import PreferIndexCatalog
+from app.services.data_quality_service import DataQualityService
 from app.services.geo_service import GeoService
 from app.services.health_service import HealthService
+from app.services.hierarchy_service import HierarchyService
 from app.services.interfaces import IndexStatusReader, MeterCatalog
 from app.services.meter_service import MeterService
+from app.services.quality.registry import CHECKS
 from app.services.reading_service import ReadingService
 from app.services.sync_service import SyncService
 from app.services.transformer_service import TransformerService
@@ -255,3 +258,18 @@ def get_sync_repository(
     conn: Annotated[AsyncConnection, Depends(get_db_connection, scope="function")],
 ) -> SyncRepository:
     return SqliteSyncRepository(conn)
+
+
+def get_hierarchy_service(
+    meters: Annotated[MeterRepository, Depends(get_meter_repository)],
+    transformers: Annotated[TransformerRepository, Depends(get_transformer_repository)],
+) -> HierarchyService:
+    return HierarchyService(meters, transformers)
+
+
+def get_data_quality_service(
+    meters: Annotated[MeterRepository, Depends(get_meter_repository)],
+    transformers: Annotated[TransformerRepository, Depends(get_transformer_repository)],
+) -> DataQualityService:
+    # The one line that picks the checks: everything in the registry.
+    return DataQualityService(CHECKS, meters, transformers)

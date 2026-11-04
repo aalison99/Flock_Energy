@@ -7,10 +7,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 ROUTES: dict[tuple[str, str], set[str]] = {
+    ("get", "/api/v1/data-quality"): {"200", "409", "422"},
     ("get", "/api/v1/health"): {"200"},
     ("get", "/api/v1/health/ready"): {"200", "503"},
     ("get", "/api/v1/geo/bbox"): {"200", "409", "422"},
     ("get", "/api/v1/geo/near"): {"200", "409", "422"},
+    ("get", "/api/v1/hierarchy"): {"200", "409", "422"},
+    ("get", "/api/v1/hierarchy/node"): {"200", "404", "409", "422"},
+    ("get", "/api/v1/hierarchy/node/meters"): {"200", "404", "409", "422"},
     ("get", "/api/v1/meters"): {"200", "409", "422", "502", "503"},
     ("get", "/api/v1/meters/facets"): {"200", "409", "422"},
     ("get", "/api/v1/meters/{meter_id}"): {"200", "404", "422", "502", "503"},
@@ -92,6 +96,10 @@ def test_enum_values_are_in_the_spec(spec: Any) -> None:
 def test_operation_ids(spec: Any) -> None:
     ids = {(m, p): op["operationId"] for p, ops in spec["paths"].items() for m, op in ops.items()}
     assert ids == {
+        ("get", "/api/v1/data-quality"): "getDataQualityReport",
+        ("get", "/api/v1/hierarchy"): "getHierarchyTree",
+        ("get", "/api/v1/hierarchy/node"): "getHierarchyNode",
+        ("get", "/api/v1/hierarchy/node/meters"): "listHierarchyNodeMeters",
         ("get", "/api/v1/health"): "getHealth",
         ("get", "/api/v1/health/ready"): "getReadiness",
         ("get", "/api/v1/geo/bbox"): "findMetersInBox",

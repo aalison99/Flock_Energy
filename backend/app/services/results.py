@@ -4,8 +4,16 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
-from app.domain.models import GeoPoint, Meter, SyncRun, Transformer
+from app.domain.models import (
+    GeoPoint,
+    HierarchyLevel,
+    Meter,
+    PageResult,
+    SyncRun,
+    Transformer,
+)
 from app.portal.interfaces import BreakerState
+from app.services.quality.models import Issue, Severity
 from app.services.readings.buckets import Bucket, Resolution
 from app.services.readings.series import IntervalKind, IntervalPoint
 
@@ -80,3 +88,66 @@ class ReadingSeriesResult:
     buckets: list[Bucket] | None
     summary: ReadingSummary
     meta: Meta
+
+
+@dataclass(frozen=True)
+class TreeNode:
+    """A hierarchy node with subtree meter count and status split, plus depth-limited children."""
+
+    id: str
+    level: HierarchyLevel
+    code: str
+    name: str
+    meter_count: int
+    status_breakdown: dict[str, int]
+    unplaced_count: int
+    children: list["TreeNode"]
+
+
+@dataclass(frozen=True)
+class NodeSummary:
+    """A node without its children: ancestors on a path, or a child in a listing."""
+
+    id: str
+    level: HierarchyLevel
+    code: str
+    name: str
+    meter_count: int
+
+
+@dataclass(frozen=True)
+class AliasView:
+    name: str
+    meter_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class NodeDetail:
+    """One node: its breadcrumb path (root to itself), children, counts and alias names."""
+
+    id: str
+    level: HierarchyLevel
+    code: str
+    name: str
+    path: list[NodeSummary]
+    children: list[NodeSummary]
+    meter_count: int
+    status_breakdown: dict[str, int]
+    unplaced_count: int
+    alt_names: list[AliasView]
+
+
+@dataclass(frozen=True)
+class CheckInfo:
+    id: str
+    severity: Severity
+    description: str
+
+
+@dataclass(frozen=True)
+class QualityReport:
+    """Per-check counts and the check list (both unfiltered) plus one page of issues."""
+
+    summary: dict[str, int]
+    checks: list[CheckInfo]
+    items: PageResult[Issue]

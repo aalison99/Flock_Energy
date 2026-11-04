@@ -3,7 +3,7 @@
 from collections import Counter
 from datetime import datetime
 
-from app.domain.models import Meter, PageResult
+from app.domain.models import Meter, PageResult, Transformer
 from app.portal.interfaces import BreakerState, Freshness
 from app.repositories.interfaces import MeterQuery
 from app.services.results import IndexInfo
@@ -53,6 +53,9 @@ class FakeMeterRepository:
     async def count(self) -> int:
         return len(self.meters)
 
+    async def list_all(self) -> list[Meter]:
+        return sorted(self.meters, key=lambda m: m.meter_id)
+
     async def get(self, meter_id: str) -> Meter | None:
         return next((m for m in self.meters if m.meter_id == meter_id), None)
 
@@ -89,3 +92,19 @@ class FakeMeterRepository:
             and min_lat <= m.geo.lat <= max_lat
             and min_lng <= m.geo.lng <= max_lng
         ][:limit]
+
+
+class FakeTransformerRepository:
+    """TransformerRepository over a plain list."""
+
+    def __init__(self, transformers: list[Transformer] | None = None) -> None:
+        self.transformers = list(transformers or [])
+
+    async def list_all(self) -> list[Transformer]:
+        return sorted(self.transformers, key=lambda t: t.code)
+
+    async def get(self, code: str) -> Transformer | None:
+        return next((t for t in self.transformers if t.code == code), None)
+
+    async def count(self) -> int:
+        return len(self.transformers)
