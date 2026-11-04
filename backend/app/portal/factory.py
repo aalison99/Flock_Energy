@@ -1,5 +1,8 @@
 """Builds the portal client stack: Caching(Retrying(Http(Session))); primitives only."""
 
+import asyncio
+import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 import httpx
@@ -9,6 +12,7 @@ from app.portal.breaker import CircuitBreaker
 from app.portal.caching import CachingClient, TtlPolicy
 from app.portal.http_client import HttpPortalClient
 from app.portal.interfaces import BreakerStateReader, FreshnessReader, PortalClient
+from app.portal.pacer import RequestPacer
 from app.portal.parsers.registry import default_registry
 from app.portal.retrying import RetryingClient, RetryPolicy
 from app.portal.secret import Secret
@@ -35,6 +39,9 @@ def build_portal_stack(
     ttls: TtlPolicy,
     cache: Cache,
     clock: Clock,
+    max_rps: float,
+    monotonic: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> PortalStack:
     """Wire the portal client stack; makes no network calls (the session logs in lazily)."""
@@ -43,6 +50,7 @@ def build_portal_stack(
         PortalCredentials(email, Secret(password)),
         timeout_s=timeout_s,
         transport=transport,
+        pacer=RequestPacer(max_rps=max_rps, monotonic=monotonic, sleep=sleep),
     )
     http = HttpPortalClient(session, default_registry(), HmacSha256Signer(), clock)
     breaker = CircuitBreaker(

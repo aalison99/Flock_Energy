@@ -9,7 +9,7 @@ from app.portal.caching import CachingClient, TtlPolicy
 from app.portal.factory import PortalStack, build_portal_stack
 from app.portal.http_client import HttpPortalClient
 from app.portal.retrying import RetryingClient, RetryPolicy
-from tests.support.fake_clock import FakeClock
+from tests.support.fake_clock import FakeClock, no_sleep
 from tests.support.portal_emulator import PortalEmulator
 
 
@@ -29,6 +29,8 @@ class Built:
             ttls=TtlPolicy(100, 10),
             cache=InMemoryTTLCache(clock, 10),
             clock=clock,
+            max_rps=1000,
+            sleep=no_sleep,
             transport=httpx.MockTransport(self._handle),
         )
 

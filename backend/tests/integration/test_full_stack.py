@@ -10,13 +10,14 @@ from fastapi.testclient import TestClient
 
 from app.core.cache import InMemoryTTLCache
 from app.core.config import Settings
-from app.core.deps import get_breaker_state, get_freshness, get_portal
+from app.core.deps import get_breaker_state, get_freshness, get_portal, get_task_runner
 from app.main import create_app
 from app.portal.caching import TtlPolicy
 from app.portal.factory import build_portal_stack
 from app.portal.retrying import RetryPolicy
-from tests.support.fake_clock import FakeClock
+from tests.support.fake_clock import FakeClock, no_sleep
 from tests.support.portal_emulator import PortalEmulator
+from tests.support.tasks import ManualTaskRunner
 
 STATIC_TTL_S = 86400
 READINGS_TTL_S = 900
@@ -44,6 +45,8 @@ def stack(settings: Settings) -> Iterator[Stack]:
         ttls=TtlPolicy(STATIC_TTL_S, 900),
         cache=InMemoryTTLCache(clock, 1000),
         clock=clock,
+        max_rps=1000,
+        sleep=no_sleep,
         transport=httpx.MockTransport(emulator.handle),
     )
     app = create_app(settings)
@@ -123,3 +126,40 @@ def test_readings_cached_then_stale_on_error(stack: Stack) -> None:
 def test_uncached_readings_with_portal_down_is_503(stack: Stack) -> None:
     stack.emulator.fail_next(50, status=503)
     assert stack.client.get("/api/v1/meters/J100000/readings").status_code == 503
+
+
+def test_sync_through_the_real_stack_fills_the_index_via_the_signed_export(
+    settings: Settings,
+) -> None:
+    emulator = PortalEmulator()
+    clock = FakeClock(datetime(2026, 11, 4, tzinfo=UTC))
+    built = build_portal_stack(
+        base_url="https://portal.example.test",
+        email="tester@example.test",
+        password=emulator.password,
+        timeout_s=5,
+        retry=RetryPolicy(2, 0.001, 0.002, 1.0),
+        breaker_threshold=50,
+        breaker_reset_s=30,
+        ttls=TtlPolicy(STATIC_TTL_S, 900),
+        cache=InMemoryTTLCache(clock, 1000),
+        clock=clock,
+        max_rps=1000,
+        sleep=no_sleep,
+        transport=httpx.MockTransport(emulator.handle),
+    )
+    app = create_app(settings)
+    app.dependency_overrides[get_portal] = lambda: built.client
+    app.dependency_overrides[get_freshness] = lambda: built.freshness
+    app.dependency_overrides[get_breaker_state] = lambda: built.breaker
+    tasks = ManualTaskRunner()
+    app.dependency_overrides[get_task_runner] = lambda: tasks
+    with TestClient(app, raise_server_exceptions=False) as client:
+        assert client.post("/api/v1/sync", json={"include_readings": False}).status_code == 202
+        client.portal.call(tasks.run_all)  # type: ignore[union-attr]
+        latest = client.get("/api/v1/sync/status").json()["latest"]
+        assert latest["status"] == "succeeded", latest
+        assert latest["strategy"] == "export"
+        assert latest["counts"]["meters"] == 403
+        ready = client.get("/api/v1/health/ready").json()
+        assert ready["index"]["meter_count"] == 403

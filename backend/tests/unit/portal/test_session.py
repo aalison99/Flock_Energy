@@ -15,7 +15,7 @@ from app.domain.exceptions import (
 )
 from app.portal.parsers.registry import PayloadKind, default_registry
 from app.portal.secret import Secret
-from app.portal.session import PortalCredentials, PortalSession
+from app.portal.session import DEFAULT_429_WAIT_S, PortalCredentials, PortalSession
 from tests.support.portal_emulator import PortalEmulator
 
 pytestmark = pytest.mark.anyio
@@ -287,14 +287,14 @@ async def test_429_retry_after(emulator: PortalEmulator) -> None:
 
 
 @pytest.mark.parametrize("value", ["soon", "-3", "1.5", "\u00b2", "\u0663", None])
-async def test_429_unparseable_retry_after_is_ignored(
+async def test_429_without_a_usable_retry_after_waits_the_default(
     emulator: PortalEmulator, value: str | None
 ) -> None:
     raw = [] if value is None else [(b"retry-after", value.encode())]
     s = fixed_status(emulator, httpx.Response(429, headers=raw))
     with pytest.raises(UpstreamUnavailableError) as info:
         await s.request("GET", "/portal/dts", parse=geo)
-    assert info.value.retry_after_s is None
+    assert info.value.retry_after_s == DEFAULT_429_WAIT_S == 5
     await s.aclose()
 
 

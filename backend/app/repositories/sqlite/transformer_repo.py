@@ -1,6 +1,6 @@
 """SQLite implementation of TransformerRepository."""
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import datetime
 
 from sqlalchemy import func, select
@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from app.db.tables import transformers
 from app.domain.models import Transformer
 from app.repositories.sqlite import mapping
-from app.repositories.sqlite._bulk import upsert_rows
+from app.repositories.sqlite._bulk import delete_missing, upsert_rows
 
 
 class SqliteTransformerRepository:
@@ -32,3 +32,6 @@ class SqliteTransformerRepository:
     async def count(self) -> int:
         stmt = select(func.count()).select_from(transformers)
         return (await self._conn.execute(stmt)).scalar_one()
+
+    async def delete_missing(self, keep_codes: Collection[str]) -> int:
+        return await delete_missing(self._conn, transformers, transformers.c.code, keep_codes)

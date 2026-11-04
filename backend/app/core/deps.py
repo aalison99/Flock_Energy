@@ -4,6 +4,7 @@ Tests swap implementations through `app.dependency_overrides`.
 """
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -14,13 +15,16 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from app.core.cache import InMemoryTTLCache
 from app.core.clock import SystemClock
 from app.core.config import Settings
-from app.core.interfaces import Clock
+from app.core.interfaces import Clock, TaskRunner
+from app.core.tasks import AsyncioTaskRunner
 from app.db.engine import make_async_engine, run_migrations
+from app.domain.exceptions import ConflictError
 from app.portal.caching import TtlPolicy
 from app.portal.factory import build_portal_stack
 from app.portal.interfaces import BreakerStateReader, FreshnessReader, PortalClient
 from app.portal.retrying import RetryPolicy
 from app.repositories.interfaces import (
+    IndexStore,
     MeterRepository,
     ReadingRepository,
     SyncRepository,
@@ -28,14 +32,18 @@ from app.repositories.interfaces import (
 )
 from app.repositories.sqlite.meter_repo import SqliteMeterRepository
 from app.repositories.sqlite.reading_repo import SqliteReadingRepository
+from app.repositories.sqlite.store import SqliteIndexStore
 from app.repositories.sqlite.sync_repo import SqliteSyncRepository
 from app.repositories.sqlite.transformer_repo import SqliteTransformerRepository
 from app.services.catalogs.live_catalog import LiveMeterCatalog
 from app.services.health_service import HealthService
-from app.services.interfaces import MeterCatalog
+from app.services.interfaces import IndexStatusReader, MeterCatalog
 from app.services.meter_service import MeterService
 from app.services.reading_service import ReadingService
+from app.services.sync_service import SyncService
 from app.services.transformer_service import TransformerService
+
+logger = logging.getLogger("urja.startup")
 
 
 def wire(app: FastAPI, settings: Settings) -> None:
@@ -57,6 +65,7 @@ def wire(app: FastAPI, settings: Settings) -> None:
         ttls=TtlPolicy(static_s=settings.ttl_static_s, readings_s=settings.ttl_readings_s),
         cache=InMemoryTTLCache(clock, settings.cache_max_entries),
         clock=clock,
+        max_rps=settings.portal_max_rps,
     )
     app.state.settings = settings
     app.state.clock = clock
@@ -64,11 +73,24 @@ def wire(app: FastAPI, settings: Settings) -> None:
     app.state.freshness = stack.freshness
     app.state.breaker = stack.breaker
     app.state.db_engine = make_async_engine(settings.db_url)  # lazy: no file I/O until first use
+    app.state.tasks = AsyncioTaskRunner()
+
+
+def build_sync_service(
+    portal: PortalClient,
+    store: IndexStore,
+    tasks: TaskRunner,
+    clock: Clock,
+    settings: Settings,
+) -> SyncService:
+    """The one place a SyncService is assembled (request provider and startup both use it)."""
+    return SyncService(portal, store, tasks, clock, concurrency=settings.sync_concurrency)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Migrate the DB and fail leftover sync runs; on shutdown close the portal, then the DB."""
+    """Migrate, fail leftover runs, start a sync if the index is empty; on shutdown stop tasks,
+    then close the portal, then the DB."""
     settings: Settings = app.state.settings
     engine: AsyncEngine = app.state.db_engine
     try:
@@ -78,12 +100,34 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await SqliteSyncRepository(conn).fail_stale_runs(
                 app.state.clock.now(), "interrupted: process restarted"
             )
+        if settings.sync_on_startup:
+            service = build_sync_service(
+                app.state.portal,
+                SqliteIndexStore(engine),
+                app.state.tasks,
+                app.state.clock,
+                settings,
+            )
+            await _sync_if_index_empty(service, settings)
         yield
     finally:
         try:
-            await app.state.portal.aclose()
+            await app.state.tasks.aclose()
         finally:
-            await engine.dispose()
+            try:
+                await app.state.portal.aclose()
+            finally:
+                await engine.dispose()
+
+
+async def _sync_if_index_empty(service: SyncService, settings: Settings) -> None:
+    """The run itself is a background task, so startup makes no portal request."""
+    if (await service.index_info()).ready:
+        return
+    try:
+        await service.start(include_readings=settings.sync_readings_on_startup)
+    except ConflictError:
+        logger.warning("startup sync skipped: a sync is already running")
 
 
 def get_settings(request: Request) -> Settings:
@@ -139,10 +183,30 @@ def get_transformer_service(
     return TransformerService(portal)
 
 
+def get_index_store(request: Request) -> IndexStore:
+    return SqliteIndexStore(request.app.state.db_engine)
+
+
+def get_task_runner(request: Request) -> TaskRunner:
+    tasks: TaskRunner = request.app.state.tasks
+    return tasks
+
+
+def get_sync_service(
+    portal: Annotated[PortalClient, Depends(get_portal)],
+    store: Annotated[IndexStore, Depends(get_index_store)],
+    tasks: Annotated[TaskRunner, Depends(get_task_runner)],
+    clock: Annotated[Clock, Depends(get_clock)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> SyncService:
+    return build_sync_service(portal, store, tasks, clock, settings)
+
+
 def get_health_service(
     breaker: Annotated[BreakerStateReader, Depends(get_breaker_state)],
+    index: Annotated[IndexStatusReader, Depends(get_sync_service)],
 ) -> HealthService:
-    return HealthService(breaker)
+    return HealthService(breaker, index)
 
 
 async def get_db_connection(request: Request) -> AsyncIterator[AsyncConnection]:

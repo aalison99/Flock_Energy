@@ -157,3 +157,21 @@ async def test_uncommitted_concurrent_start_run_is_a_conflict(db_url: str) -> No
             await ta.rollback()
     finally:
         await eng.dispose()
+
+
+async def test_update_counts_while_running(engine: AsyncEngine) -> None:
+    async with engine.begin() as c:
+        repo = SqliteSyncRepository(c)
+        run = await repo.start_run(T0)
+        await repo.update_counts(run.id, {"meters": 5, "readings": 0})
+        await repo.update_counts(run.id, {"meters": 7})
+        current = await repo.current()
+        assert current is not None
+        assert dict(current.counts) == {"meters": 7}
+        assert current.status is SyncStatus.RUNNING
+
+
+async def test_update_counts_unknown_run_is_not_found(engine: AsyncEngine) -> None:
+    async with engine.begin() as c:
+        with pytest.raises(NotFoundError):
+            await SqliteSyncRepository(c).update_counts(999, {"meters": 1})

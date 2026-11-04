@@ -19,6 +19,7 @@ def settings(tmp_path: Path) -> Settings:
     return Settings(
         db_url=f"sqlite:///{tmp_path / 'app.db'}",
         environment="test",
+        sync_on_startup=False,  # no background portal traffic unless a test asks for it
         portal_url="https://portal.example.test",  # type: ignore[arg-type]
         portal_email="tester@example.test",
         portal_password="s3cret-value",  # type: ignore[arg-type]

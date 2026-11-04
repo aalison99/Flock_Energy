@@ -1,9 +1,9 @@
 """Chunked bulk writes shared by the SQLite repositories."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from typing import Any
 
-from sqlalchemy import Table
+from sqlalchemy import Column, Table, delete, select
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 
@@ -31,3 +31,19 @@ async def insert_rows(
     for i in range(0, len(rows), CHUNK_SIZE):
         await conn.execute(insert(table), rows[i : i + CHUNK_SIZE])
     return len(rows)
+
+
+async def delete_missing(
+    conn: AsyncConnection, table: Table, key: Column[str], keep: Collection[str]
+) -> int:
+    """Delete rows whose key is not in `keep`; returns rows deleted.
+
+    Reads the stored keys and deletes the difference in chunks, so no statement ever binds
+    more than CHUNK_SIZE parameters (SQLite caps bind variables per statement).
+    """
+    keep_set = set(keep)
+    stored = (await conn.execute(select(key))).scalars().all()
+    doomed = [k for k in stored if k not in keep_set]
+    for i in range(0, len(doomed), CHUNK_SIZE):
+        await conn.execute(delete(table).where(key.in_(doomed[i : i + CHUNK_SIZE])))
+    return len(doomed)

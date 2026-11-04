@@ -156,3 +156,31 @@ def test_model_level_error_names_the_fields(clean_env: pytest.MonkeyPatch) -> No
     msg = str(exc.value)
     assert "URJA_RETRY_MAX_DELAY_S" in msg and "URJA_RETRY_BASE_DELAY_S" in msg
     assert "URJA_?" not in msg
+
+
+def _required(**extra: object) -> Settings:
+    return Settings(
+        portal_url="https://p.example.test",  # type: ignore[arg-type]
+        portal_email="a@b.test",
+        portal_password="pw",  # type: ignore[arg-type]
+        _env_file=None,
+        **extra,  # type: ignore[arg-type]
+    )
+
+
+def test_sync_settings_defaults() -> None:
+    s = _required()
+    assert (s.sync_on_startup, s.sync_readings_on_startup, s.sync_concurrency) == (True, True, 4)
+
+
+@pytest.mark.parametrize("value", [0, 5])
+def test_sync_concurrency_is_limited_to_1_to_4(value: int) -> None:
+    with pytest.raises(ValidationError):
+        _required(sync_concurrency=value)
+
+
+def test_portal_max_rps_default_and_bounds() -> None:
+    assert _required().portal_max_rps == 1.5
+    for bad in (0, -1, 20.5):
+        with pytest.raises(ValidationError):
+            _required(portal_max_rps=bad)

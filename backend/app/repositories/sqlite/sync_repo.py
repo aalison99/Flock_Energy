@@ -62,6 +62,15 @@ class SqliteSyncRepository:
             raise NotFoundError(f"sync run {run_id} not found")
         return await self._get(run_id)
 
+    async def update_counts(self, run_id: int, counts: Mapping[str, int]) -> None:
+        result = await self._conn.execute(
+            update(sync_runs)
+            .where(sync_runs.c.id == run_id)
+            .values(counts=mapping.counts_to_json(counts))
+        )
+        if result.rowcount == 0:
+            raise NotFoundError(f"sync run {run_id} not found")
+
     async def current(self) -> SyncRun | None:
         return await self._first(
             select(sync_runs).where(sync_runs.c.status == SyncStatus.RUNNING.value)

@@ -25,3 +25,7 @@ class FakeSleeper:
         self.delays.append(delay)
         if self._clock is not None:
             self._clock.advance(delay)
+
+
+async def no_sleep(_delay: float) -> None:
+    """A sleep that returns at once, for stacks whose pacing is not under test."""

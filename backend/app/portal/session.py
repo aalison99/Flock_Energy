@@ -14,11 +14,13 @@ from app.domain.exceptions import (
     UpstreamUnavailableError,
 )
 from app.portal.errors import SessionExpired
+from app.portal.pacer import RequestPacer
 from app.portal.parsers.registry import PayloadKind, default_registry
 from app.portal.secret import Secret
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_429_WAIT_S = 5  # the portal sends no Retry-After with its 429s
 _PARSE_STATUSES = frozenset({401, 404})  # the body carries the real error signal
 
 
@@ -39,6 +41,7 @@ class PortalSession:
         timeout_s: float,
         transport: httpx.AsyncBaseTransport | None = None,
         user_agent: str = "urja-meter-api/0.1",
+        pacer: RequestPacer | None = None,
     ) -> None:
         if not base_url.startswith("https://"):
             raise ValueError("portal base_url must be https (the session cookie is Secure)")
@@ -52,6 +55,7 @@ class PortalSession:
             transport=transport,
             headers={"User-Agent": user_agent, "Accept": "application/json"},
         )
+        self._pacer = pacer
         self._lock = asyncio.Lock()
         self._generation = 0  # 0 = never logged in
         self._closed = False
@@ -156,6 +160,8 @@ class PortalSession:
         data: dict[str, str] | None = None,
         headers: dict[str, str] | None = None,
     ) -> httpx.Response:
+        if self._pacer is not None:
+            await self._pacer.acquire()
         try:
             return await self._client.request(
                 method, path, params=params, data=data, headers=headers
@@ -170,7 +176,7 @@ class PortalSession:
         status = response.status_code
         if status == 429:
             raw = response.headers.get("retry-after", "").strip()
-            retry_after = int(raw) if raw.isascii() and raw.isdigit() else None
+            retry_after = int(raw) if raw.isascii() and raw.isdigit() else DEFAULT_429_WAIT_S
             raise UpstreamUnavailableError(
                 "portal rate limited: HTTP 429", retry_after_s=retry_after
             )

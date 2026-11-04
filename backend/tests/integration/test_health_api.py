@@ -5,7 +5,11 @@ from tests.integration.conftest import Api
 def test_ready_when_closed(api: Api) -> None:
     r = api.client.get("/api/v1/health/ready")
     assert r.status_code == 200
-    assert r.json() == {"status": "ready", "portal": {"breaker": "closed"}}
+    assert r.json() == {
+        "status": "ready",
+        "portal": {"breaker": "closed"},
+        "index": {"ready": False, "meter_count": 0, "last_sync_at": None},
+    }
     assert r.headers["X-Request-ID"]
 
 
@@ -20,7 +24,9 @@ def test_not_ready_when_open_is_503_with_same_shape(api: Api) -> None:
     api.breaker.state = BreakerState.OPEN
     r = api.client.get("/api/v1/health/ready")
     assert r.status_code == 503
-    assert r.json() == {"status": "not_ready", "portal": {"breaker": "open"}}
+    assert r.json()["status"] == "not_ready"
+    assert r.json()["portal"] == {"breaker": "open"}
+    assert r.json()["index"]["ready"] is False
     assert r.headers["X-Request-ID"]
 
 

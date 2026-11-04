@@ -155,6 +155,7 @@ The request must be **signed**. I found the scheme in the page's own JavaScript 
 | Two reading intervals | 30-min vs daily (§3.4) | Interval detected per series. |
 | Strings for numbers | geo, kWh, kVAh, voltage | Converted to numbers at the edge. |
 | Lying HTTP statuses | Wrong password and unknown meter (route data) return 200 | The body is checked, not just the status. |
+| **Blank register rows** | Some energy payloads contain a row with a missing or blank `kwh` (seen in 3 of ~200 meters sampled on 4 Nov) | The row is skipped, so it shows up as a gap in the series instead of failing the whole meter. |
 | Serial prefixes | `SE`, `GE`, `AL`, `L&`, `HP`, `GN` don't correspond to the make (e.g. `SE…` serials occur across all five makes) | Treated as opaque strings. We don't validate make from serial. |
 
 What was **consistent**:
@@ -184,6 +185,11 @@ What was **consistent**:
 | Transformers | `/portal/dts` (2 pages) | The only source of capacity |
 | Readings | `/portal/meters/<id>/energy`, with `from`/`to` when the caller gives a range | The only source of readings |
 | Session upkeep | Re-login on any of the three expiry signals; one re-login at a time | The cookie lasts 1 hour, and long syncs or long-running servers outlive it |
+
+### 5.1 Rate limiting (measured 4 Nov 2026)
+- Every time we exceeded it, the **121st-or-so request** got **`HTTP 429`**: a burst of ~120 requests in ~3 s, and a sync paced at 4 requests/s (failed after ~120 requests, ~30 s). The 429 carries **no `Retry-After` header** and no rate-limit headers.
+- **1 request/s for 191 requests got no 429.** The best fit is a budget of about **120 requests per minute**; the exact window is **Unknown**.
+- *Handled:* every portal request goes through a pacer (`portal_max_rps`, default **1.5**, i.e. 90/min). A 429 without `Retry-After` is retried after 5 s. A full sync with readings (~450 requests) therefore takes about five minutes, in the background.
 
 ## 6. Open questions (still unknown)
 - Whether the session expiry slides with activity. *Handled: we re-login on expiry.*

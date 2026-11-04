@@ -139,6 +139,41 @@
         "title": "HierarchyNodeOut",
         "type": "object"
       },
+      "IndexReadiness": {
+        "description": "State of the local SQLite index (filled by the sync).",
+        "properties": {
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the last successful sync finished; null if none has.",
+            "title": "Last Sync At"
+          },
+          "meter_count": {
+            "description": "Number of meters in the index.",
+            "title": "Meter Count",
+            "type": "integer"
+          },
+          "ready": {
+            "description": "True once the index holds at least one meter.",
+            "title": "Ready",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ready",
+          "meter_count",
+          "last_sync_at"
+        ],
+        "title": "IndexReadiness",
+        "type": "object"
+      },
       "InstallStatus": {
         "enum": [
           "installed",
@@ -528,6 +563,10 @@
       "ReadinessResponse": {
         "description": "Readiness probe payload; also the body of the 503 'not ready' answer.",
         "properties": {
+          "index": {
+            "$ref": "#/components/schemas/IndexReadiness",
+            "description": "Local index state; an empty index does not make the service not ready."
+          },
           "portal": {
             "$ref": "#/components/schemas/PortalReadiness",
             "description": "Portal connectivity details."
@@ -544,7 +583,8 @@
         },
         "required": [
           "status",
-          "portal"
+          "portal",
+          "index"
         ],
         "title": "ReadinessResponse",
         "type": "object"
@@ -951,6 +991,191 @@
         "title": "Resolution",
         "type": "string"
       },
+      "SyncRequest": {
+        "description": "Options for a sync run.",
+        "example": {
+          "include_readings": true
+        },
+        "properties": {
+          "include_readings": {
+            "default": true,
+            "description": "Also fetch every meter's readings (slower); false syncs only the rest.",
+            "title": "Include Readings",
+            "type": "boolean"
+          }
+        },
+        "title": "SyncRequest",
+        "type": "object"
+      },
+      "SyncRunOut": {
+        "description": "One attempt to refresh the local index from the portal.",
+        "example": {
+          "counts": {
+            "meters": 403,
+            "meters_removed": 0,
+            "readings": 1250,
+            "readings_failed": 0,
+            "readings_meters": 403,
+            "transformers": 40,
+            "transformers_removed": 0
+          },
+          "finished_at": "2026-11-04T09:01:12Z",
+          "id": 3,
+          "started_at": "2026-11-04T09:00:00Z",
+          "status": "succeeded",
+          "strategy": "export"
+        },
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Progress counters: meters, meters_removed, transformers, transformers_removed, readings, readings_meters, readings_failed.",
+            "title": "Counts",
+            "type": "object"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the run failed; null otherwise.",
+            "title": "Error"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the run ended; null while running.",
+            "title": "Finished At"
+          },
+          "id": {
+            "description": "Run id; later runs have larger ids.",
+            "title": "Id",
+            "type": "integer"
+          },
+          "started_at": {
+            "description": "When the run started (UTC).",
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "description": "Where the run stands.",
+            "enum": [
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "strategy": {
+            "anyOf": [
+              {
+                "enum": [
+                  "export",
+                  "crawl"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How meters were fetched: bulk export or per-meter crawl; null until known.",
+            "title": "Strategy"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "strategy",
+          "started_at",
+          "finished_at",
+          "counts",
+          "error"
+        ],
+        "title": "SyncRunOut",
+        "type": "object"
+      },
+      "SyncStatusResponse": {
+        "description": "The latest sync run and the latest one that succeeded.",
+        "example": {
+          "last_successful": {
+            "counts": {
+              "meters": 403,
+              "meters_removed": 0,
+              "readings": 1250,
+              "readings_failed": 0,
+              "readings_meters": 403,
+              "transformers": 40,
+              "transformers_removed": 0
+            },
+            "finished_at": "2026-11-04T09:01:12Z",
+            "id": 3,
+            "started_at": "2026-11-04T09:00:00Z",
+            "status": "succeeded",
+            "strategy": "export"
+          },
+          "latest": {
+            "counts": {
+              "meters": 403,
+              "meters_removed": 0,
+              "readings": 1250,
+              "readings_failed": 0,
+              "readings_meters": 403,
+              "transformers": 40,
+              "transformers_removed": 0
+            },
+            "finished_at": "2026-11-04T09:01:12Z",
+            "id": 3,
+            "started_at": "2026-11-04T09:00:00Z",
+            "status": "succeeded",
+            "strategy": "export"
+          }
+        },
+        "properties": {
+          "last_successful": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncRunOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The most recent run that succeeded; null if none has."
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncRunOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The most recent run; null if none has run."
+          }
+        },
+        "required": [
+          "latest",
+          "last_successful"
+        ],
+        "title": "SyncStatusResponse",
+        "type": "object"
+      },
       "TransformerOut": {
         "description": "A distribution transformer (DT).",
         "example": {
@@ -1028,7 +1253,7 @@
     },
     "/api/v1/health/ready": {
       "get": {
-        "description": "Ready unless the portal circuit breaker is open; never calls the portal.",
+        "description": "Ready unless the portal circuit breaker is open; never calls the portal. Also reports the local index (an empty index is reported, not a failure).",
         "operationId": "getReadiness",
         "responses": {
           "200": {
@@ -1380,6 +1605,87 @@
         "summary": "Get a meter's consumption series",
         "tags": [
           "readings"
+        ]
+      }
+    },
+    "/api/v1/sync": {
+      "post": {
+        "description": "Starts refreshing the local index from the portal. The run continues in the background: poll GET /sync/status. Only one run at a time (409 otherwise).",
+        "operationId": "startSync",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/SyncRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A sync is already running"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          }
+        },
+        "summary": "Start a sync",
+        "tags": [
+          "sync"
+        ]
+      }
+    },
+    "/api/v1/sync/status": {
+      "get": {
+        "description": "The latest sync run and the latest successful one; both null if never synced.",
+        "operationId": "getSyncStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sync status",
+        "tags": [
+          "sync"
         ]
       }
     },

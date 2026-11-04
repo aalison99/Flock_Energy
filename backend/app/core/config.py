@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     ttl_static_s: float = Field(default=86400.0, gt=0)
     ttl_readings_s: float = Field(default=900.0, gt=0)
     cache_max_entries: int = Field(default=10000, ge=1)
+    portal_max_rps: float = Field(default=1.5, gt=0, le=20)  # portal request starts per second
+    sync_on_startup: bool = True  # fill an empty index in the background at startup
+    sync_readings_on_startup: bool = True
+    sync_concurrency: int = Field(default=4, ge=1, le=4)  # per-meter portal calls in flight
 
     @field_validator("log_level", mode="before")
     @classmethod

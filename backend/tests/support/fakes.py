@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from app.portal.interfaces import BreakerState, Freshness
+from app.services.results import IndexInfo
 
 
 class FakeFreshness:
@@ -25,3 +26,13 @@ class FakeBreaker:
 
     def __init__(self, state: BreakerState = BreakerState.CLOSED) -> None:
         self.state = state
+
+
+class FakeIndexReader:
+    """IndexStatusReader returning a settable IndexInfo."""
+
+    def __init__(self, info: IndexInfo | None = None) -> None:
+        self.info = info or IndexInfo(ready=False, meter_count=0, last_sync_at=None)
+
+    async def index_info(self) -> IndexInfo:
+        return self.info

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
-from app.domain.models import GeoPoint, Meter
+from app.domain.models import GeoPoint, Meter, SyncRun
 from app.portal.interfaces import BreakerState
 from app.services.readings.buckets import Bucket, Resolution
 from app.services.readings.series import IntervalKind, IntervalPoint
@@ -27,9 +27,25 @@ class MeterDetailResult:
 
 
 @dataclass(frozen=True)
+class IndexInfo:
+    """What the local index holds: ready once it has at least one meter."""
+
+    ready: bool
+    meter_count: int
+    last_sync_at: datetime | None
+
+
+@dataclass(frozen=True)
+class SyncStatusResult:
+    latest: SyncRun | None
+    last_successful: SyncRun | None
+
+
+@dataclass(frozen=True)
 class ReadinessResult:
     ready: bool
     breaker: BreakerState
+    index: IndexInfo
 
 
 @dataclass(frozen=True)

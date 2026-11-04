@@ -27,6 +27,7 @@ class HealthResponse(BaseModel):
 
 
 _DESCRIPTIONS = {
+    409: "A sync is already running",
     404: "Not found",
     422: "Validation failed",
     502: "Portal auth or protocol failure",

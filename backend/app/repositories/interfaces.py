@@ -4,7 +4,9 @@ Each repository works on the connection it was built with, so the caller's trans
 the unit of work.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
+from contextlib import AbstractAsyncContextManager
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Protocol
 
@@ -24,6 +26,10 @@ class MeterRepository(Protocol):
         """Every meter, ordered by meter_id."""
         ...
 
+    async def delete_missing(self, keep_ids: Collection[str]) -> int:
+        """Delete meters whose id is not in `keep_ids` (their readings cascade); returns rows."""
+        ...
+
 
 class TransformerRepository(Protocol):
     async def upsert_many(self, transformers: Sequence[Transformer], synced_at: datetime) -> int:
@@ -37,6 +43,10 @@ class TransformerRepository(Protocol):
         ...
 
     async def count(self) -> int: ...
+
+    async def delete_missing(self, keep_codes: Collection[str]) -> int:
+        """Delete transformers whose code is not in `keep_codes`; returns rows deleted."""
+        ...
 
 
 class ReadingRepository(Protocol):
@@ -67,6 +77,10 @@ class SyncRepository(Protocol):
         error: str | None,
     ) -> SyncRun: ...
 
+    async def update_counts(self, run_id: int, counts: Mapping[str, int]) -> None:
+        """Replace a running run's progress counts."""
+        ...
+
     async def current(self) -> SyncRun | None:
         """The running run, if any."""
         ...
@@ -77,4 +91,22 @@ class SyncRepository(Protocol):
 
     async def fail_stale_runs(self, finished_at: datetime, error: str) -> int:
         """Mark leftover 'running' rows failed (crash recovery); returns rows changed."""
+        ...
+
+
+@dataclass(frozen=True)
+class IndexRepos:
+    """The repositories bound to one transaction."""
+
+    meters: MeterRepository
+    transformers: TransformerRepository
+    readings: ReadingRepository
+    runs: SyncRepository
+
+
+class IndexStore(Protocol):
+    """Opens transactions on the local index outside a request (the background sync)."""
+
+    def transaction(self) -> AbstractAsyncContextManager[IndexRepos]:
+        """Commit on clean exit, roll back on error."""
         ...

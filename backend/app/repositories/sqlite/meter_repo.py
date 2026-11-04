@@ -1,6 +1,6 @@
 """SQLite implementation of MeterRepository."""
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import datetime
 
 from sqlalchemy import func, select
@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from app.db.tables import meters
 from app.domain.models import Meter
 from app.repositories.sqlite import mapping
-from app.repositories.sqlite._bulk import upsert_rows
+from app.repositories.sqlite._bulk import delete_missing, upsert_rows
 
 
 class SqliteMeterRepository:
@@ -31,3 +31,6 @@ class SqliteMeterRepository:
     async def list_all(self) -> list[Meter]:
         result = await self._conn.execute(select(meters).order_by(meters.c.meter_id))
         return [mapping.row_to_meter(r) for r in result.mappings()]
+
+    async def delete_missing(self, keep_ids: Collection[str]) -> int:
+        return await delete_missing(self._conn, meters, meters.c.meter_id, keep_ids)

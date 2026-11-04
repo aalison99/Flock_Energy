@@ -1,8 +1,9 @@
 """Core Protocols (Clock, Cache) that services depend on instead of concrete classes."""
 
+from collections.abc import Coroutine
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class Clock(Protocol):
@@ -32,3 +33,11 @@ class Cache(Protocol):
     def set(self, key: str, value: object, ttl_s: float) -> None: ...
 
     def invalidate(self, prefix: str) -> None: ...
+
+
+class TaskRunner(Protocol):
+    """Starts background work that outlives the request which asked for it."""
+
+    def spawn(self, name: str, coro: Coroutine[Any, Any, None]) -> None:
+        """Run `coro` in the background; must be called from a running event loop."""
+        ...

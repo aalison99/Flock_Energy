@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.domain.models import Meter, PageResult
+from app.services.results import IndexInfo
 
 
 @dataclass(frozen=True)
@@ -21,3 +22,9 @@ class MeterCatalog(Protocol):
     async def get(self, meter_id: str) -> Meter:
         """Raises NotFoundError for an unknown meter."""
         ...
+
+
+class IndexStatusReader(Protocol):
+    """Read-only view of the local index (for the readiness probe)."""
+
+    async def index_info(self) -> IndexInfo: ...

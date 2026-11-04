@@ -4,7 +4,9 @@ Startup/shutdown tests monkeypatch `app.core.deps.build_portal_stack` to inject 
 MockTransport that counts requests; everything else is the real wiring.
 """
 
+import asyncio
 import sqlite3
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -20,13 +22,19 @@ from app.core.config import Settings
 from app.core.deps import (
     get_breaker_state,
     get_freshness,
+    get_index_store,
     get_meter_repository,
     get_portal,
     get_reading_repository,
     get_sync_repository,
+    get_sync_service,
+    get_task_runner,
     get_transformer_repository,
 )
+from app.core.interfaces import TaskRunner
+from app.core.tasks import AsyncioTaskRunner
 from app.db.engine import run_migrations
+from app.domain.exceptions import ConflictError
 from app.domain.models import Meter
 from app.main import create_app
 from app.portal.breaker import BreakerState
@@ -35,12 +43,16 @@ from app.portal.factory import PortalStack
 from app.portal.fake import FakePortalClient
 from app.portal.interfaces import BreakerStateReader, FreshnessReader, PortalClient
 from app.repositories.interfaces import (
+    IndexStore,
     MeterRepository,
     ReadingRepository,
     SyncRepository,
     TransformerRepository,
 )
+from app.repositories.sqlite.store import SqliteIndexStore
+from app.services.sync_service import SyncService
 from tests.support.portal_emulator import FIXTURES, PortalEmulator
+from tests.support.tasks import ManualTaskRunner
 
 FIXTURES_DIR: Path = FIXTURES
 
@@ -68,7 +80,7 @@ def requests_seen(monkeypatch: pytest.MonkeyPatch) -> list[httpx.Request]:
         return emulator.handle(request)
 
     def build(**kwargs: Any) -> Any:
-        return real(**{**kwargs, "transport": httpx.MockTransport(handle)})
+        return real(**{**kwargs, "max_rps": 1000.0, "transport": httpx.MockTransport(handle)})
 
     monkeypatch.setattr(deps, "build_portal_stack", build)
     return seen
@@ -119,6 +131,7 @@ def test_settings_reach_the_stack(settings: Settings, monkeypatch: pytest.Monkey
     assert captured["retry"].attempts == settings.retry_attempts
     assert captured["ttls"].readings_s == settings.ttl_readings_s
     assert captured["breaker_threshold"] == settings.breaker_failure_threshold
+    assert captured["max_rps"] == settings.portal_max_rps == 1.5
 
 
 def test_dependency_override_swaps_portal(
@@ -339,3 +352,145 @@ def test_commit_happens_before_the_response_is_sent(settings: Settings) -> None:
         # armed after startup, whose own transaction must still commit
         event.listen(app.state.db_engine.sync_engine, "commit", fail_commit)
         assert client.post("/_test/write").status_code == 500
+
+
+# -- M5b: background sync wiring ------------------------------------------------------------
+
+
+def _sync_app(settings: Settings, **overrides: Any) -> tuple[FastAPI, ManualTaskRunner, Any]:
+    """An app whose startup sync is held back by a ManualTaskRunner over the fake portal."""
+    app = create_app(settings.model_copy(update=overrides))
+    tasks = ManualTaskRunner()
+    portal = FakePortalClient(FIXTURES_DIR)
+    app.state.tasks = tasks
+    app.state.portal = portal
+    return app, tasks, portal
+
+
+def _runs(settings: Settings) -> list[tuple[str, str | None]]:
+    with sqlite3.connect(_db_path(settings)) as db:
+        return db.execute("SELECT status, error FROM sync_runs ORDER BY id").fetchall()
+
+
+def test_empty_db_starts_a_sync_on_startup_without_portal_requests(settings: Settings) -> None:
+    app, tasks, portal = _sync_app(settings, sync_on_startup=True, sync_readings_on_startup=False)
+    with TestClient(app):
+        assert tasks.names == ["sync"]  # spawned, not yet run: startup made no portal request
+        assert portal.calls == []
+        assert _runs(settings) == [("running", None)]
+        tasks.discard()
+
+
+def test_startup_sync_runs_to_completion_and_respects_the_readings_flag(settings: Settings) -> None:
+    app, tasks, portal = _sync_app(settings, sync_on_startup=True, sync_readings_on_startup=False)
+    with TestClient(app) as client:
+        client.portal.call(tasks.run_all)  # type: ignore[union-attr]
+    assert _runs(settings) == [("succeeded", None)]
+    assert not any(c[0] == "get_readings" for c in portal.calls)
+
+
+def test_startup_sync_includes_readings_by_default(settings: Settings) -> None:
+    app, tasks, portal = _sync_app(settings, sync_on_startup=True)
+    with TestClient(app) as client:
+        client.portal.call(tasks.run_all)  # type: ignore[union-attr]
+    assert any(c[0] == "get_readings" for c in portal.calls)
+
+
+def test_no_startup_sync_when_the_index_has_meters(settings: Settings) -> None:
+    app, tasks, _ = _sync_app(settings, sync_on_startup=True)
+    with TestClient(app) as client:
+        client.portal.call(tasks.run_all)  # type: ignore[union-attr]
+    second, tasks2, portal2 = _sync_app(settings, sync_on_startup=True)
+    with TestClient(second):
+        assert tasks2.names == []
+    assert [c for c in portal2.calls if c[0] != "aclose"] == []
+
+
+def test_no_startup_sync_when_the_flag_is_off(settings: Settings) -> None:
+    app, tasks, _ = _sync_app(settings, sync_on_startup=False)
+    with TestClient(app):
+        assert tasks.names == []
+    assert _runs(settings) == []
+
+
+def test_conflict_at_startup_is_logged_and_ignored(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    async def clash(self: SyncService, include_readings: bool) -> Any:
+        raise ConflictError("a sync is already running")
+
+    monkeypatch.setattr(SyncService, "start", clash)
+    app, tasks, _ = _sync_app(settings, sync_on_startup=True)
+    with TestClient(app) as client:
+        assert client.get("/api/v1/health").status_code == 200
+    assert tasks.names == []
+    assert "already running" in caplog.text
+
+
+def test_shutdown_cancels_tasks_before_closing_the_portal_and_the_engine(
+    settings: Settings,
+) -> None:
+    app = create_app(settings)
+    order: list[str] = []
+    real: AsyncEngine = app.state.db_engine
+
+    class TasksSpy:
+        async def aclose(self) -> None:
+            order.append("tasks")
+
+    class PortalSpy:
+        async def aclose(self) -> None:
+            order.append("portal")
+
+    class EngineSpy:
+        def begin(self) -> Any:
+            return real.begin()
+
+        async def dispose(self) -> None:
+            order.append("engine")
+            await real.dispose()
+
+    app.state.tasks = TasksSpy()
+    app.state.portal = PortalSpy()
+    app.state.db_engine = EngineSpy()
+    with TestClient(app):
+        assert order == []
+    assert order == ["tasks", "portal", "engine"]
+
+
+def test_shutdown_cancels_a_running_sync(settings: Settings) -> None:
+    app = create_app(settings.model_copy(update={"sync_on_startup": True}))
+    portal = FakePortalClient(FIXTURES_DIR)
+    started = threading.Event()
+
+    async def hang() -> list[Meter]:
+        started.set()
+        await asyncio.sleep(3600)
+        return []
+
+    portal.bulk_export = hang  # type: ignore[method-assign]
+    app.state.portal = portal
+    with TestClient(app):
+        assert started.wait(5)
+    assert _runs(settings) == [("failed", "cancelled")]
+
+
+def test_sync_providers_are_wired_and_swappable(settings: Settings) -> None:
+    app = create_app(settings)
+    assert isinstance(app.state.tasks, AsyncioTaskRunner)
+    seen: dict[str, Any] = {}
+
+    @app.get("/_test/sync")
+    async def probe(
+        store: Annotated[IndexStore, Depends(get_index_store)],
+        tasks: Annotated[TaskRunner, Depends(get_task_runner)],
+        service: Annotated[SyncService, Depends(get_sync_service)],
+    ) -> dict[str, bool]:
+        seen.update(store=store, tasks=tasks, service=service)
+        return {"ok": True}
+
+    with TestClient(app) as client:
+        assert client.get("/_test/sync").status_code == 200
+    assert isinstance(seen["store"], SqliteIndexStore)
+    assert seen["tasks"] is app.state.tasks
+    assert isinstance(seen["service"], SyncService)

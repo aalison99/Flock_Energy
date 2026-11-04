@@ -1,6 +1,7 @@
 """Every parser: happy path from its fixture, malformed input, and embedded signals."""
 
 import json
+import logging
 from datetime import timedelta
 from pathlib import Path
 
@@ -241,3 +242,59 @@ def test_injected_detail_registry_is_used() -> None:
     meter = MeterDetailParser(formats).parse(body)
     assert isinstance(meter, Meter)
     assert (meter.meter_id, meter.build) == ("JX", "dummy")
+
+
+def _energy(*rows: dict[str, object]) -> bytes:
+    return json.dumps({"data": list(rows)}).encode()
+
+
+def _row(day: int, kwh: object, kvah: object) -> dict[str, object]:
+    return {"timestamp": f"{day:02d}/01/2026 00:00", "kwh": kwh, "kvah": kvah, "voltR": "230"}
+
+
+@pytest.mark.parametrize(
+    ("kwh", "kvah"), [("", "2"), ("   ", "2"), (None, "2"), ("2", ""), ("2", None), ("", "")]
+)
+def test_energy_skips_rows_with_blank_registers(
+    kwh: object, kvah: object, caplog: pytest.LogCaptureFixture
+) -> None:
+    raw_body = _energy(_row(1, "1", "1"), _row(2, kwh, kvah), _row(3, "3", "3"))
+    with caplog.at_level(logging.WARNING):
+        got = registry.parse(PayloadKind.ENERGY, raw_body)
+    assert isinstance(got, list)
+    assert [r.kwh_register for r in got] == [1.0, 3.0]  # day 2 became a gap
+    warnings_ = [r.getMessage() for r in caplog.records if "skipped" in r.getMessage()]
+    assert warnings_ == ["energy payload: skipped 1 row(s) with blank registers"]
+
+
+def test_energy_missing_key_counts_as_blank() -> None:
+    row = {"timestamp": "02/01/2026 00:00", "kvah": "2"}  # no kwh key at all
+    got = registry.parse(PayloadKind.ENERGY, _energy(_row(1, "1", "1"), row))
+    assert isinstance(got, list) and len(got) == 1
+
+
+def test_energy_all_blank_is_an_empty_list_not_an_error(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING):
+        got = registry.parse(PayloadKind.ENERGY, _energy(_row(1, "", ""), _row(2, None, "")))
+    assert got == []
+    assert "skipped 2 row(s)" in caplog.text
+
+
+def test_energy_without_blank_rows_logs_nothing(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING):
+        registry.parse(PayloadKind.ENERGY, _energy(_row(1, "1", "1")))
+    assert "skipped" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        _row(1, "abc", "1"),
+        _row(1, "1", "abc"),
+        {"timestamp": "not a date", "kwh": "1", "kvah": "1"},
+        {"timestamp": "01/01/2026 00:00", "kwh": "1", "kvah": "1", "voltR": "oops"},
+    ],
+)
+def test_energy_other_malformed_values_still_raise(bad: dict[str, object]) -> None:
+    with pytest.raises(UpstreamProtocolError):
+        registry.parse(PayloadKind.ENERGY, _energy(_row(2, "1", "1"), bad))

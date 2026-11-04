@@ -12,7 +12,7 @@ from app.portal.factory import build_portal_stack
 from app.portal.interfaces import PortalClient
 from app.portal.retrying import RetryPolicy
 from tests.contract.portal_contract import PortalClientContract
-from tests.support.fake_clock import FakeClock
+from tests.support.fake_clock import FakeClock, no_sleep
 from tests.support.portal_emulator import PortalEmulator
 
 
@@ -32,6 +32,8 @@ class TestWrappedPortal(PortalClientContract):
             ttls=TtlPolicy(86400, 900),
             cache=InMemoryTTLCache(clock, 1000),
             clock=clock,
+            max_rps=1000,
+            sleep=no_sleep,
             transport=httpx.MockTransport(emulator.handle),
         )
         yield stack.client
