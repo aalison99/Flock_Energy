@@ -11,6 +11,7 @@ ROUTES: dict[tuple[str, str], set[str]] = {
     ("get", "/api/v1/health/ready"): {"200", "503"},
     ("get", "/api/v1/meters"): {"200", "422", "502", "503"},
     ("get", "/api/v1/meters/{meter_id}"): {"200", "404", "422", "502", "503"},
+    ("get", "/api/v1/meters/{meter_id}/readings"): {"200", "404", "422", "502", "503"},
     ("get", "/api/v1/transformers"): {"200", "422", "502", "503"},
     ("get", "/api/v1/transformers/{code}"): {"200", "404", "422", "502", "503"},
 }
@@ -89,6 +90,7 @@ def test_operation_ids(spec: Any) -> None:
         ("get", "/api/v1/health/ready"): "getReadiness",
         ("get", "/api/v1/meters"): "listMeters",
         ("get", "/api/v1/meters/{meter_id}"): "getMeter",
+        ("get", "/api/v1/meters/{meter_id}/readings"): "getMeterReadings",
         ("get", "/api/v1/transformers"): "listTransformers",
         ("get", "/api/v1/transformers/{code}"): "getTransformer",
     }
@@ -115,11 +117,21 @@ def test_every_field_and_param_is_described(spec: Any) -> None:
 
 def test_examples_validate_against_their_models() -> None:
     from app.api.v1.schemas.meters import MeterDetail, MeterSummary
+    from app.api.v1.schemas.readings import ReadingSeriesResponse
     from app.api.v1.schemas.transformers import TransformerOut
 
-    for model in (MeterDetail, MeterSummary, TransformerOut):
+    for model in (MeterDetail, MeterSummary, TransformerOut, ReadingSeriesResponse):
         extra: Any = model.model_config["json_schema_extra"]
         model.model_validate(extra["example"])
+
+
+def test_reading_enums_are_in_the_spec(spec: Any) -> None:
+    assert _enum_of(spec, "ReadingSeriesResponse", "resolution") == ["raw", "hourly", "daily"]
+    assert _enum_of(spec, "ReadingSeriesResponse", "interval_kind") == [
+        "half_hourly",
+        "daily",
+        "unknown",
+    ]
 
 
 def test_breaker_literal_matches_the_breaker_enum(spec: Any) -> None:

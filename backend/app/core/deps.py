@@ -21,6 +21,7 @@ from app.services.catalogs.live_catalog import LiveMeterCatalog
 from app.services.health_service import HealthService
 from app.services.interfaces import MeterCatalog
 from app.services.meter_service import MeterService
+from app.services.reading_service import ReadingService
 from app.services.transformer_service import TransformerService
 
 
@@ -97,6 +98,14 @@ def get_meter_service(
     clock: Annotated[Clock, Depends(get_clock)],
 ) -> MeterService:
     return MeterService(catalog, portal, freshness, clock)
+
+
+def get_reading_service(
+    portal: Annotated[PortalClient, Depends(get_portal)],
+    freshness: Annotated[FreshnessReader, Depends(get_freshness)],
+    clock: Annotated[Clock, Depends(get_clock)],
+) -> ReadingService:
+    return ReadingService(portal, freshness, clock)
 
 
 def get_transformer_service(

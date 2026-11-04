@@ -19,6 +19,7 @@ from tests.support.fake_clock import FakeClock
 from tests.support.portal_emulator import PortalEmulator
 
 STATIC_TTL_S = 86400
+READINGS_TTL_S = 900
 
 
 @dataclass
@@ -97,3 +98,28 @@ def test_uncached_meter_with_portal_down_is_503(stack: Stack) -> None:
     r = stack.client.get("/api/v1/meters/J100000")
     assert r.status_code == 503
     assert r.json()["error"]["code"] == "upstream_unavailable"
+
+
+def test_readings_cached_then_stale_on_error(stack: Stack) -> None:
+    url = "/api/v1/meters/J100000/readings?start=2026-06-29&end=2026-06-30"
+    first = stack.client.get(url)
+    assert first.status_code == 200
+    assert len(first.json()["points"]) == 96
+    seen = len(stack.emulator.requests)
+    assert seen > 0
+
+    again = stack.client.get(url)
+    assert again.status_code == 200
+    assert len(stack.emulator.requests) == seen  # served from cache, no emulator hit
+
+    stack.emulator.fail_next(50, status=503)
+    stack.clock.advance(READINGS_TTL_S + 1)
+    stale = stack.client.get(url)
+    assert stale.status_code == 200
+    assert stale.json()["meta"]["stale"] is True
+    assert len(stale.json()["points"]) == 96
+
+
+def test_uncached_readings_with_portal_down_is_503(stack: Stack) -> None:
+    stack.emulator.fail_next(50, status=503)
+    assert stack.client.get("/api/v1/meters/J100000/readings").status_code == 503

@@ -549,6 +549,408 @@
         "title": "ReadinessResponse",
         "type": "object"
       },
+      "ReadingBucket": {
+        "description": "Consumption summed over an hour or a day (intervals belong to the bucket of their start).",
+        "properties": {
+          "avg_voltage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mean R-phase voltage (V, 1 dp), if reported.",
+            "title": "Avg Voltage"
+          },
+          "end": {
+            "description": "Bucket end (IST), exclusive.",
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "flags": {
+            "description": "Sorted union of the member intervals' flags.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "kvah": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sum of interval kVAh; null when none has a value.",
+            "title": "Kvah"
+          },
+          "kwh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sum of interval kWh; null when no interval has a value.",
+            "title": "Kwh"
+          },
+          "power_factor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "kwh / kvah of the sums (3 dp), if defined.",
+            "title": "Power Factor"
+          },
+          "readings": {
+            "description": "Number of intervals attributed to this bucket.",
+            "title": "Readings",
+            "type": "integer"
+          },
+          "start": {
+            "description": "Bucket start (IST), inclusive.",
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "kwh",
+          "kvah",
+          "power_factor",
+          "avg_voltage",
+          "readings",
+          "flags"
+        ],
+        "title": "ReadingBucket",
+        "type": "object"
+      },
+      "ReadingPoint": {
+        "description": "One portal reading with the consumption over the interval that ends at it.",
+        "properties": {
+          "at": {
+            "description": "When the register was read (IST, ISO 8601 with +05:30).",
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "flags": {
+            "description": "Data-quality flags: register_reset, gap, pf_out_of_range.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "interval_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Start of the interval ending at `at`; null for the first reading.",
+            "title": "Interval Start"
+          },
+          "kvah": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Apparent energy used in the interval (kVAh, 3 dp).",
+            "title": "Kvah"
+          },
+          "kvah_register": {
+            "description": "Cumulative apparent-energy register (kVAh).",
+            "title": "Kvah Register",
+            "type": "number"
+          },
+          "kwh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Active energy used in the interval (kWh, 3 dp); null for the first reading or after a register reset.",
+            "title": "Kwh"
+          },
+          "kwh_register": {
+            "description": "Cumulative active-energy register (kWh).",
+            "title": "Kwh Register",
+            "type": "number"
+          },
+          "power_factor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "kwh / kvah (3 dp); null when either is missing or kvah is not positive.",
+            "title": "Power Factor"
+          },
+          "voltage_r": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "R-phase voltage (V), if reported.",
+            "title": "Voltage R"
+          }
+        },
+        "required": [
+          "at",
+          "interval_start",
+          "kwh_register",
+          "kvah_register",
+          "voltage_r",
+          "kwh",
+          "kvah",
+          "power_factor",
+          "flags"
+        ],
+        "title": "ReadingPoint",
+        "type": "object"
+      },
+      "ReadingSeriesResponse": {
+        "description": "Clean consumption series for one meter.",
+        "example": {
+          "interval_kind": "half_hourly",
+          "interval_minutes": 30,
+          "meta": {
+            "fetched_at": "2026-11-04T12:00:00Z",
+            "source": "portal",
+            "stale": false
+          },
+          "meter_id": "J100000",
+          "points": [
+            {
+              "at": "2026-06-24T00:00:00+05:30",
+              "flags": [],
+              "interval_start": "2026-06-23T23:30:00+05:30",
+              "kvah": 0.45,
+              "kvah_register": 52314.29,
+              "kwh": 0.42,
+              "kwh_register": 48439.16,
+              "power_factor": 0.933,
+              "voltage_r": 229.0
+            }
+          ],
+          "resolution": "raw",
+          "summary": {
+            "avg_voltage": 229.8,
+            "first_at": "2026-06-23T23:30:00+05:30",
+            "gaps": 0,
+            "last_at": "2026-06-30T23:30:00+05:30",
+            "readings": 337,
+            "resets": 0,
+            "total_kvah": 153.41,
+            "total_kwh": 142.05
+          }
+        },
+        "properties": {
+          "buckets": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReadingBucket"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Hourly or daily buckets when resolution is not raw; null otherwise.",
+            "title": "Buckets"
+          },
+          "interval_kind": {
+            "description": "Cadence class of the meter.",
+            "enum": [
+              "half_hourly",
+              "daily",
+              "unknown"
+            ],
+            "title": "Interval Kind",
+            "type": "string"
+          },
+          "interval_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Detected reading cadence in minutes (median gap); null under two readings.",
+            "title": "Interval Minutes"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/MetaOut",
+            "description": "Provenance and freshness of this answer."
+          },
+          "meter_id": {
+            "description": "Portal meter id, J followed by six digits.",
+            "title": "Meter Id",
+            "type": "string"
+          },
+          "points": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReadingPoint"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Interval points when resolution is raw; null otherwise.",
+            "title": "Points"
+          },
+          "resolution": {
+            "$ref": "#/components/schemas/Resolution",
+            "description": "Resolution of this series: raw, hourly or daily."
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ReadingSummaryOut",
+            "description": "Totals and data-quality counts."
+          }
+        },
+        "required": [
+          "meter_id",
+          "resolution",
+          "interval_minutes",
+          "interval_kind",
+          "points",
+          "buckets",
+          "summary",
+          "meta"
+        ],
+        "title": "ReadingSeriesResponse",
+        "type": "object"
+      },
+      "ReadingSummaryOut": {
+        "description": "Totals and data-quality counts over the whole returned range.",
+        "properties": {
+          "avg_voltage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mean R-phase voltage (V, 1 dp), if reported.",
+            "title": "Avg Voltage"
+          },
+          "first_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Time of the first reading; null when empty.",
+            "title": "First At"
+          },
+          "gaps": {
+            "description": "Number of missing intervals inside the range.",
+            "title": "Gaps",
+            "type": "integer"
+          },
+          "last_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Time of the last reading; null when empty.",
+            "title": "Last At"
+          },
+          "readings": {
+            "description": "Number of portal readings in the range.",
+            "title": "Readings",
+            "type": "integer"
+          },
+          "resets": {
+            "description": "Number of intervals with a register reset.",
+            "title": "Resets",
+            "type": "integer"
+          },
+          "total_kvah": {
+            "description": "Total apparent energy (kVAh); resets are excluded.",
+            "title": "Total Kvah",
+            "type": "number"
+          },
+          "total_kwh": {
+            "description": "Total active energy (kWh); resets are excluded.",
+            "title": "Total Kwh",
+            "type": "number"
+          }
+        },
+        "required": [
+          "total_kwh",
+          "total_kvah",
+          "avg_voltage",
+          "readings",
+          "gaps",
+          "resets",
+          "first_at",
+          "last_at"
+        ],
+        "title": "ReadingSummaryOut",
+        "type": "object"
+      },
+      "Resolution": {
+        "enum": [
+          "raw",
+          "hourly",
+          "daily"
+        ],
+        "title": "Resolution",
+        "type": "string"
+      },
       "TransformerOut": {
         "description": "A distribution transformer (DT).",
         "example": {
@@ -845,6 +1247,139 @@
         "summary": "Get a meter",
         "tags": [
           "meters"
+        ]
+      }
+    },
+    "/api/v1/meters/{meter_id}/readings": {
+      "get": {
+        "description": "Consumption per interval (or summed per hour/day) computed from the portal's cumulative registers. The portal holds a fixed snapshot (23-30 Jun 2026); ranges outside it return empty data.",
+        "operationId": "getMeterReadings",
+        "parameters": [
+          {
+            "description": "Meter id, J followed by six digits.",
+            "in": "path",
+            "name": "meter_id",
+            "required": true,
+            "schema": {
+              "description": "Meter id, J followed by six digits.",
+              "pattern": "^J\\d{6}$",
+              "title": "Meter Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "First calendar day (IST, inclusive), YYYY-MM-DD. Default: no lower bound.",
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First calendar day (IST, inclusive), YYYY-MM-DD. Default: no lower bound.",
+              "title": "Start"
+            }
+          },
+          {
+            "description": "Last calendar day (IST, inclusive), YYYY-MM-DD. Default: no upper bound.",
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last calendar day (IST, inclusive), YYYY-MM-DD. Default: no upper bound.",
+              "title": "End"
+            }
+          },
+          {
+            "description": "raw = one point per reading; hourly or daily = summed buckets.",
+            "in": "query",
+            "name": "resolution",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Resolution",
+              "default": "raw",
+              "description": "raw = one point per reading; hourly or daily = summed buckets."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadingSeriesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portal auth or protocol failure"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Portal unavailable",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (present when the portal gave a hint).",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get a meter's consumption series",
+        "tags": [
+          "readings"
         ]
       }
     },
