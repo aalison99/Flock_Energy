@@ -4,6 +4,106 @@
  */
 
 export interface paths {
+    "/api/v1/analytics/anomalies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List meter anomalies
+         * @description Findings from every registered rule over the indexed readings, ordered by severity (error, warning, info), then meter id, then time. `rules` lists every rule. Needs the local index.
+         */
+        get: operations["listAnomalies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/consumption": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get consumption per hour or day
+         * @description Energy summed across the meters of a hierarchy node (default: the whole fleet). Meters reporting less often than the resolution are left out and counted in `meters_excluded_coarser`. Needs the local index.
+         */
+        get: operations["getConsumption"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the fleet summary
+         * @description Meter counts by status, reporting versus silent meters, total consumption, the reading window and anomaly counts per rule, computed from the indexed readings. Needs the local index.
+         */
+        get: operations["getFleetSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/top-consumers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the top consuming meters
+         * @description Reporting meters by total kWh, highest first, ties by meter id. Needs the local index.
+         */
+        get: operations["getTopConsumers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/transformers/load": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Estimate distribution transformer loading
+         * @description Estimated peak and average kVA per DT from its half-hourly meters, against rated capacity. An estimate: see `estimate_note`. Needs the local index.
+         */
+        get: operations["getTransformerLoad"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/data-quality": {
         parameters: {
             query?: never;
@@ -221,6 +321,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/meters/{meter_id}/anomalies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List one meter's anomalies
+         * @description Every rule finding for the meter, most severe first. Needs the local index.
+         */
+        get: operations["getMeterAnomalies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/meters/{meter_id}/readings": {
         parameters: {
             query?: never;
@@ -362,6 +482,82 @@ export interface components {
             name: string;
         };
         /**
+         * AnomalyListResponse
+         * @description A page of anomalies plus the rule list.
+         */
+        AnomalyListResponse: {
+            /**
+             * Has Next
+             * @description Whether a later page exists.
+             */
+            has_next: boolean;
+            /**
+             * Items
+             * @description The items on this page.
+             */
+            items: components["schemas"]["AnomalyOut"][];
+            /**
+             * Page
+             * @description Current page number, starting at 1.
+             */
+            page: number;
+            /**
+             * Page Size
+             * @description Maximum items per page.
+             */
+            page_size: number;
+            /**
+             * Rules
+             * @description Every registered rule, regardless of filters.
+             */
+            rules: components["schemas"]["RuleOut"][];
+            /**
+             * Total
+             * @description Total number of matching items.
+             */
+            total: number;
+            /**
+             * Total Pages
+             * @description Total number of pages at this page size.
+             */
+            total_pages: number;
+        };
+        /**
+         * AnomalyOut
+         * @description One rule finding for one meter.
+         */
+        AnomalyOut: {
+            /**
+             * At
+             * @description Instant of the finding (IST); null when not dated.
+             */
+            at: string | null;
+            /**
+             * Evidence
+             * @description Rule-specific facts behind the finding.
+             */
+            evidence: {
+                [key: string]: unknown;
+            };
+            /**
+             * Message
+             * @description Human-readable summary.
+             */
+            message: string;
+            /**
+             * Meter Id
+             * @description Meter the finding is about.
+             */
+            meter_id: string;
+            /**
+             * Rule
+             * @description Id of the rule that fired.
+             */
+            rule: string;
+            /** @description Severity of the rule. */
+            severity: components["schemas"]["Severity"];
+        };
+        /**
          * BBoxMeter
          * @description A meter inside a bounding box (the slim shape a map needs).
          */
@@ -436,6 +632,71 @@ export interface components {
             severity: components["schemas"]["Severity"];
         };
         /**
+         * ConsumptionBucketOut
+         * @description Energy summed over the contributing meters for one hour or day.
+         */
+        ConsumptionBucketOut: {
+            /**
+             * End
+             * Format: date-time
+             * @description Bucket end, exclusive (IST).
+             */
+            end: string;
+            /**
+             * Kvah
+             * @description Apparent energy in kVAh.
+             */
+            kvah: number | null;
+            /**
+             * Kwh
+             * @description Active energy in kWh.
+             */
+            kwh: number | null;
+            /**
+             * Meters
+             * @description Meters that contributed to this bucket.
+             */
+            meters: number;
+            /**
+             * Start
+             * Format: date-time
+             * @description Bucket start (IST).
+             */
+            start: string;
+        };
+        /**
+         * ConsumptionResponse
+         * @description Consumption per hour or day across a node's meters (or the whole fleet).
+         */
+        ConsumptionResponse: {
+            /**
+             * Items
+             * @description Buckets, ascending by start.
+             */
+            items: components["schemas"]["ConsumptionBucketOut"][];
+            /**
+             * Meters Excluded Coarser
+             * @description Reporting meters left out because their interval is coarser than the bucket.
+             */
+            meters_excluded_coarser: number;
+            /**
+             * Meters Included
+             * @description Meters whose cadence fits the resolution.
+             */
+            meters_included: number;
+            /**
+             * Node
+             * @description The node filter that was applied, if any.
+             */
+            node: string | null;
+            /**
+             * Resolution
+             * @description Bucket width.
+             * @enum {string}
+             */
+            resolution: "hourly" | "daily";
+        };
+        /**
          * DataQualityResponse
          * @description A page of issues plus unfiltered counts per check.
          */
@@ -482,6 +743,67 @@ export interface components {
              * @description Total number of pages at this page size.
              */
             total_pages: number;
+        };
+        /**
+         * DtLoadOut
+         * @description Estimated loading of one distribution transformer.
+         */
+        DtLoadOut: {
+            /**
+             * Avg Kva Est
+             * @description Estimated average apparent power in kVA.
+             */
+            avg_kva_est: number | null;
+            /**
+             * Capacity Kva
+             * @description Rated capacity in kVA.
+             */
+            capacity_kva: number;
+            /**
+             * Code
+             * @description DT code.
+             */
+            code: string;
+            /**
+             * Half Hourly Meters
+             * @description Of those, meters reporting half-hourly.
+             */
+            half_hourly_meters: number;
+            /**
+             * Meter Count
+             * @description Indexed meters on this DT.
+             */
+            meter_count: number;
+            /**
+             * Name
+             * @description DT name.
+             */
+            name: string;
+            /**
+             * Overloaded
+             * @description True when utilisation_pct exceeds 100.
+             */
+            overloaded: boolean;
+            /**
+             * Peak At
+             * @description Start of the peak half hour (IST).
+             */
+            peak_at: string | null;
+            /**
+             * Peak Kva Est
+             * @description Estimated peak apparent power in kVA; null without half-hourly data.
+             */
+            peak_kva_est: number | null;
+            /**
+             * Skipped Gap Intervals
+             * @description Half-hourly intervals left out of the estimate because they span a data gap.
+             */
+            skipped_gap_intervals: number;
+            /**
+             * Utilisation Pct
+             * @description Peak as a percentage of capacity.
+             */
+            utilisation_pct: number | null;
         };
         /**
          * ErrorBody
@@ -547,6 +869,58 @@ export interface components {
                     [key: string]: number;
                 };
             };
+        };
+        /**
+         * FleetSummaryOut
+         * @description Fleet-wide figures computed from the indexed readings.
+         */
+        FleetSummaryOut: {
+            /**
+             * Anomalies By Rule
+             * @description Anomaly count per rule id, zero-filled for every registered rule.
+             */
+            anomalies_by_rule: {
+                [key: string]: number;
+            };
+            /**
+             * First Reading At
+             * @description Earliest reading instant (IST); null when no meter reports.
+             */
+            first_reading_at: string | null;
+            /**
+             * Interval Kinds
+             * @description Meters per reading cadence: half_hourly, daily or unknown (unknown includes silent meters).
+             */
+            interval_kinds: {
+                [key: string]: number;
+            };
+            /**
+             * Last Reading At
+             * @description Latest reading instant (IST); null when no meter reports.
+             */
+            last_reading_at: string | null;
+            /** @description Fleet meters per installation status, every status listed. */
+            meters_by_status: components["schemas"]["StatusBreakdown"];
+            /**
+             * Reporting Meters
+             * @description Meters with at least two readings.
+             */
+            reporting_meters: number;
+            /**
+             * Silent Meters
+             * @description Meters with fewer than two readings.
+             */
+            silent_meters: number;
+            /**
+             * Total Kwh
+             * @description Energy consumed over the indexed window, in kWh.
+             */
+            total_kwh: number;
+            /**
+             * Total Meters
+             * @description Meters in the local index.
+             */
+            total_meters: number;
         };
         /**
          * GeoOut
@@ -692,6 +1066,22 @@ export interface components {
              * @description True when the data is older than its freshness limit (portal cache TTL, or the index's maximum age).
              */
             stale: boolean;
+        };
+        /**
+         * MeterAnomaliesResponse
+         * @description Every anomaly of one meter.
+         */
+        MeterAnomaliesResponse: {
+            /**
+             * Items
+             * @description Findings, most severe first.
+             */
+            items: components["schemas"]["AnomalyOut"][];
+            /**
+             * Meter Id
+             * @description The meter.
+             */
+            meter_id: string;
         };
         /**
          * MeterDetail
@@ -1307,6 +1697,24 @@ export interface components {
          */
         Resolution: "raw" | "hourly" | "daily";
         /**
+         * RuleOut
+         * @description One registered anomaly rule.
+         */
+        RuleOut: {
+            /**
+             * Description
+             * @description What the rule looks for.
+             */
+            description: string;
+            /**
+             * Id
+             * @description Rule id, usable as the `rule` filter.
+             */
+            id: string;
+            /** @description Severity of findings from this rule. */
+            severity: components["schemas"]["Severity"];
+        };
+        /**
          * Severity
          * @enum {string}
          */
@@ -1458,6 +1866,46 @@ export interface components {
             latest: components["schemas"]["SyncRunOut"] | null;
         };
         /**
+         * TopConsumerOut
+         * @description A meter and its total consumption.
+         */
+        TopConsumerOut: {
+            /** @description The meter. */
+            meter: components["schemas"]["MeterSummary"];
+            /**
+             * Total Kwh
+             * @description Energy consumed over the indexed window, in kWh.
+             */
+            total_kwh: number;
+        };
+        /**
+         * TopConsumersResponse
+         * @description Meters ordered by consumption, highest first.
+         */
+        TopConsumersResponse: {
+            /**
+             * Items
+             * @description Top consumers.
+             */
+            items: components["schemas"]["TopConsumerOut"][];
+        };
+        /**
+         * TransformerLoadResponse
+         * @description Estimated DT loading, with the formula behind it.
+         */
+        TransformerLoadResponse: {
+            /**
+             * Estimate Note
+             * @description How the estimate is computed and what it ignores.
+             */
+            estimate_note: string;
+            /**
+             * Items
+             * @description Transformers in the requested order.
+             */
+            items: components["schemas"]["DtLoadOut"][];
+        };
+        /**
          * TransformerOut
          * @description A distribution transformer (DT).
          * @example {
@@ -1555,6 +2003,240 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listAnomalies: {
+        parameters: {
+            query?: {
+                /** @description Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes. Default: the whole fleet. */
+                node?: string | null;
+                /** @description Only this rule id. */
+                rule?: string | null;
+                /** @description Only this severity. */
+                severity?: components["schemas"]["Severity"] | null;
+                /** @description Page number, starting at 1. */
+                page?: number;
+                /** @description Items per page (1 to 200). */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnomalyListResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getConsumption: {
+        parameters: {
+            query?: {
+                /** @description Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes. Default: the whole fleet. */
+                node?: string | null;
+                /** @description Bucket width. */
+                resolution?: "hourly" | "daily";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsumptionResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getFleetSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FleetSummaryOut"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getTopConsumers: {
+        parameters: {
+            query?: {
+                /** @description Node id: the codes from the zone down to the node joined by '/', e.g. Z-01/C-01/D-07/SD-07/SS-07/F-007/DT-007. Passed as a query parameter because it contains slashes. Default: the whole fleet. */
+                node?: string | null;
+                /** @description Meters to return (1 to 100). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopConsumersResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getTransformerLoad: {
+        parameters: {
+            query?: {
+                /** @description utilisation: highest first, no data last; code: ascending. */
+                sort?: "utilisation" | "code";
+                /** @description DTs to return (1 to 100). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransformerLoadResponse"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     getDataQualityReport: {
         parameters: {
             query?: {
@@ -2161,6 +2843,56 @@ export interface operations {
                 headers: {
                     /** @description Seconds to wait before retrying (present when the portal gave a hint). */
                     "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getMeterAnomalies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Meter id, J followed by six digits. */
+                meter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeterAnomaliesResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description A sync is already running, or the local index is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation failed */
+            422: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {

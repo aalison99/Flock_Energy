@@ -103,3 +103,39 @@ describe("Meter detail", () => {
     await waitFor(() => expect(container.querySelector(".leaflet-container")).not.toBeNull());
   });
 });
+
+describe("Meter anomalies", () => {
+  it("lists anomalies with severity, rule, message and time above the chart", async () => {
+    server.use(
+      http.get("*/api/v1/meters/:id/anomalies", () =>
+        HttpResponse.json({
+          meter_id: "J100000",
+          items: [
+            { rule: "consumption_spike", severity: "error", meter_id: "J100000", message: "Spike on 1 Nov", at: "2026-11-01T10:00:00+05:30", evidence: {} },
+            { rule: "inactive_but_consuming", severity: "warning", meter_id: "J100000", message: "Decommissioned but reporting", at: null, evidence: {} },
+          ],
+        }),
+      ),
+    );
+    renderApp("/meters/J100000");
+    expect(await screen.findByText("Spike on 1 Nov")).toBeInTheDocument();
+    expect(screen.getByText("error")).toHaveClass("bg-red-100");
+    expect(screen.getByText("consumption_spike")).toBeInTheDocument();
+    expect(screen.getByText("Decommissioned but reporting")).toBeInTheDocument();
+  });
+
+  it("says when there are none", async () => {
+    renderApp("/meters/J100000");
+    expect(await screen.findByText("No anomalies detected")).toBeInTheDocument();
+  });
+
+  it("shows an error, and a distinct note for 409", async () => {
+    server.use(http.get("*/api/v1/meters/:id/anomalies", () => HttpResponse.json(errorBody("internal_error", "oops"), { status: 400 })));
+    const { unmount } = renderApp("/meters/J100000");
+    expect(await screen.findByText(/Could not load anomalies: oops/)).toBeInTheDocument();
+    unmount();
+    server.use(http.get("*/api/v1/meters/:id/anomalies", () => HttpResponse.json(errorBody("index_not_ready", "x"), { status: 409 })));
+    renderApp("/meters/J100000");
+    expect(await screen.findByText(/unavailable until the index has synced/)).toBeInTheDocument();
+  });
+});

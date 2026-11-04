@@ -12,3 +12,7 @@ export class ApiError extends Error {
     this.details = details;
   }
 }
+
+export function isConflict(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 409;
+}

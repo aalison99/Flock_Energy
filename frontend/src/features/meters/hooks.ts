@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { getFacets, getMeter, listMeters } from "./api";
+import { getFacets, getMeter, getMeterAnomalies, listMeters } from "./api";
 import type { MeterListParams } from "./api";
 import type { MeterFilters } from "../../shared";
 
@@ -24,5 +24,12 @@ export function useMeter(meterId: string) {
   return useQuery({
     queryKey: ["meters", "detail", meterId],
     queryFn: () => getMeter(meterId),
+  });
+}
+
+export function useMeterAnomalies(meterId: string) {
+  return useQuery({
+    queryKey: ["meters", "anomalies", meterId],
+    queryFn: () => getMeterAnomalies(meterId),
   });
 }

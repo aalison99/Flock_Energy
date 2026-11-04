@@ -4,3 +4,4 @@ export type MeterSummary = components["schemas"]["MeterSummary"];
 export type MeterDetail = components["schemas"]["MeterDetail"];
 export type MeterPage = components["schemas"]["Page_MeterSummary_"];
 export type FacetsResponse = components["schemas"]["FacetsResponse"];
+export type MeterAnomalies = components["schemas"]["MeterAnomaliesResponse"];

@@ -8,6 +8,7 @@ import { Loading } from "../../shared/ui/Loading";
 import { Breadcrumb } from "./Breadcrumb";
 import { Freshness } from "./Freshness";
 import { useMeter } from "./hooks";
+import { MeterAnomalies } from "./MeterAnomalies";
 import { NameplateCard } from "./NameplateCard";
 
 const MiniMap = lazy(() => import("./MiniMap"));
@@ -48,6 +49,7 @@ export function MeterDetailView({ meterId, children }: { meterId: string; childr
           </Suspense>
         ) : null}
       </div>
+      <MeterAnomalies meterId={meterId} />
       {children}
     </div>
   );

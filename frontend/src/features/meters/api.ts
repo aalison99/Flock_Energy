@@ -2,7 +2,7 @@ import type { components } from "../../generated/schema";
 import { client, unwrap } from "../../lib/api-client";
 import { toApiQuery } from "../../shared";
 import type { MeterFilters } from "../../shared";
-import type { FacetsResponse, MeterDetail, MeterPage } from "./types";
+import type { FacetsResponse, MeterAnomalies, MeterDetail, MeterPage } from "./types";
 
 export interface MeterListParams {
   filters: MeterFilters;
@@ -27,4 +27,8 @@ export function getFacets(filters: MeterFilters): Promise<FacetsResponse> {
 
 export function getMeter(meterId: string): Promise<MeterDetail> {
   return unwrap(client.GET("/api/v1/meters/{meter_id}", { params: { path: { meter_id: meterId } } }));
+}
+
+export function getMeterAnomalies(meterId: string): Promise<MeterAnomalies> {
+  return unwrap(client.GET("/api/v1/meters/{meter_id}/anomalies", { params: { path: { meter_id: meterId } } }));
 }

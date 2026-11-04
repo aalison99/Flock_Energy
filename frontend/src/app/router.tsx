@@ -1,6 +1,8 @@
 import { Outlet, useRoutes } from "react-router";
 import type { RouteObject } from "react-router";
 import { HealthPill } from "../features/health";
+import { DashboardRoute } from "../routes/DashboardRoute";
+import { HierarchyRoute } from "../routes/HierarchyRoute";
 import { MeterDetailRoute } from "../routes/MeterDetailRoute";
 import { MapRoute } from "../routes/MapRoute";
 import { MetersRoute } from "../routes/MetersRoute";
@@ -19,11 +21,11 @@ export const routes: RouteObject[] = [
   {
     element: <Shell />,
     children: [
-      { path: "/", element: <Placeholder title="Dashboard" /> },
+      { path: "/", element: <DashboardRoute /> },
       { path: "/meters", element: <MetersRoute /> },
       { path: "/meters/:meterId", element: <MeterDetailRoute /> },
       { path: "/map", element: <MapRoute /> },
-      { path: "/hierarchy", element: <Placeholder title="Hierarchy" /> },
+      { path: "/hierarchy", element: <HierarchyRoute /> },
       { path: "*", element: <Placeholder title="Page not found" /> },
     ],
   },
