@@ -3,20 +3,33 @@
 Tests swap implementations through `app.dependency_overrides`.
 """
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from app.core.cache import InMemoryTTLCache
 from app.core.clock import SystemClock
 from app.core.config import Settings
 from app.core.interfaces import Clock
+from app.db.engine import make_async_engine, run_migrations
 from app.portal.caching import TtlPolicy
 from app.portal.factory import build_portal_stack
 from app.portal.interfaces import BreakerStateReader, FreshnessReader, PortalClient
 from app.portal.retrying import RetryPolicy
+from app.repositories.interfaces import (
+    MeterRepository,
+    ReadingRepository,
+    SyncRepository,
+    TransformerRepository,
+)
+from app.repositories.sqlite.meter_repo import SqliteMeterRepository
+from app.repositories.sqlite.reading_repo import SqliteReadingRepository
+from app.repositories.sqlite.sync_repo import SqliteSyncRepository
+from app.repositories.sqlite.transformer_repo import SqliteTransformerRepository
 from app.services.catalogs.live_catalog import LiveMeterCatalog
 from app.services.health_service import HealthService
 from app.services.interfaces import MeterCatalog
@@ -50,15 +63,27 @@ def wire(app: FastAPI, settings: Settings) -> None:
     app.state.portal = stack.client
     app.state.freshness = stack.freshness
     app.state.breaker = stack.breaker
+    app.state.db_engine = make_async_engine(settings.db_url)  # lazy: no file I/O until first use
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Nothing to start (the portal session logs in lazily); close the portal on shutdown."""
+    """Migrate the DB and fail leftover sync runs; on shutdown close the portal, then the DB."""
+    settings: Settings = app.state.settings
+    engine: AsyncEngine = app.state.db_engine
     try:
+        if settings.db_migrate_on_startup:
+            await asyncio.to_thread(run_migrations, settings.db_url)
+        async with engine.begin() as conn:
+            await SqliteSyncRepository(conn).fail_stale_runs(
+                app.state.clock.now(), "interrupted: process restarted"
+            )
         yield
     finally:
-        await app.state.portal.aclose()
+        try:
+            await app.state.portal.aclose()
+        finally:
+            await engine.dispose()
 
 
 def get_settings(request: Request) -> Settings:
@@ -118,3 +143,37 @@ def get_health_service(
     breaker: Annotated[BreakerStateReader, Depends(get_breaker_state)],
 ) -> HealthService:
     return HealthService(breaker)
+
+
+async def get_db_connection(request: Request) -> AsyncIterator[AsyncConnection]:
+    """One transaction per request: commit on success, roll back on error.
+
+    Used with scope="function" so the commit happens before the response is sent.
+    """
+    engine: AsyncEngine = request.app.state.db_engine
+    async with engine.begin() as conn:
+        yield conn
+
+
+def get_meter_repository(
+    conn: Annotated[AsyncConnection, Depends(get_db_connection, scope="function")],
+) -> MeterRepository:
+    return SqliteMeterRepository(conn)
+
+
+def get_transformer_repository(
+    conn: Annotated[AsyncConnection, Depends(get_db_connection, scope="function")],
+) -> TransformerRepository:
+    return SqliteTransformerRepository(conn)
+
+
+def get_reading_repository(
+    conn: Annotated[AsyncConnection, Depends(get_db_connection, scope="function")],
+) -> ReadingRepository:
+    return SqliteReadingRepository(conn)
+
+
+def get_sync_repository(
+    conn: Annotated[AsyncConnection, Depends(get_db_connection, scope="function")],
+) -> SyncRepository:
+    return SqliteSyncRepository(conn)

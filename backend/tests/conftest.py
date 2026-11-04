@@ -1,6 +1,7 @@
 """Shared fixtures: explicit settings (never read from .env), an app and a client."""
 
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
@@ -9,10 +10,14 @@ from fastapi.testclient import TestClient
 from app.core.config import Settings
 from app.main import create_app
 
+pytest_plugins = ["tests.support.db"]
+
 
 @pytest.fixture
-def settings() -> Settings:
+def settings(tmp_path: Path) -> Settings:
+    """Test settings; the database is a migrated-on-startup temp file, never ./urja.db."""
     return Settings(
+        db_url=f"sqlite:///{tmp_path / 'app.db'}",
         environment="test",
         portal_url="https://portal.example.test",  # type: ignore[arg-type]
         portal_email="tester@example.test",

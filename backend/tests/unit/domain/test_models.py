@@ -40,3 +40,23 @@ def test_hierarchy_get_every_level() -> None:
     assert HIERARCHY_LEVELS[-1] is HierarchyLevel.DT
     for lvl in HIERARCHY_LEVELS:
         assert path.get(lvl) == refs[lvl]
+
+
+def test_sync_enums_have_stable_values() -> None:
+    from app.domain.models import SyncStatus, SyncStrategy
+
+    assert [s.value for s in SyncStatus] == ["running", "succeeded", "failed"]
+    assert [s.value for s in SyncStrategy] == ["export", "crawl"]
+
+
+def test_sync_run_is_frozen() -> None:
+    from dataclasses import FrozenInstanceError
+    from datetime import UTC, datetime
+
+    import pytest
+
+    from app.domain.models import SyncRun, SyncStatus
+
+    run = SyncRun(1, SyncStatus.RUNNING, None, datetime(2026, 1, 1, tzinfo=UTC), None, {}, None)
+    with pytest.raises(FrozenInstanceError):
+        run.id = 2  # type: ignore[misc]

@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     portal_email: str
     portal_password: SecretStr
     db_url: str = "sqlite:///./urja.db"
+    db_migrate_on_startup: bool = True
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
     http_timeout_s: float = Field(default=10.0, gt=0)
     retry_attempts: int = Field(default=3, ge=1)  # total attempts, including the first

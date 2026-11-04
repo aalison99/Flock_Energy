@@ -1,6 +1,6 @@
 """Domain models shared across layers: meters, hierarchy, readings, transformers, paging."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -120,3 +120,27 @@ class Reading:
     def __post_init__(self) -> None:
         if self.at.tzinfo is None or self.at.utcoffset() is None:
             raise ValueError("Reading.at must be timezone-aware")
+
+
+class SyncStatus(StrEnum):
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class SyncStrategy(StrEnum):
+    EXPORT = "export"
+    CRAWL = "crawl"
+
+
+@dataclass(frozen=True)
+class SyncRun:
+    """One attempt to refresh the local index from the portal."""
+
+    id: int
+    status: SyncStatus
+    strategy: SyncStrategy | None
+    started_at: datetime
+    finished_at: datetime | None
+    counts: Mapping[str, int]
+    error: str | None
